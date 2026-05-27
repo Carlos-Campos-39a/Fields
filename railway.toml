@@ -1,5 +1,5 @@
 [build]
-installCommand = "npm install --prefix fields/backend"
+installCommand = "npm install"
 
 [deploy]
-startCommand = "node fields/backend/server.js"
+startCommand = "node server.js"
