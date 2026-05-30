@@ -248,6 +248,6 @@ app.get("/api/health", (_req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n  ✦ Fields' API  →  http://localhost:${PORT}/api/health\n`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`\n  ✦ Fields' API  →  http://0.0.0.0:${PORT}/api/health\n`);
 });
