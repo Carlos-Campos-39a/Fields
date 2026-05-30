@@ -23,6 +23,7 @@ const LANG_SUB = [
   { key: "lang_jp", label: "Japonês", flag: "🇯🇵", color: "#BC002D", bg: "#ffecec", border: "#f5a0a0" },
 ];
 
+// ─── Helpers ─────────────────────────────────────────────────
 function parseInput(text) {
   const t = text.trim();
   if (/^(evento|event)\s+/i.test(t))          return { type: "event",    body: t.replace(/^(evento|event)\s+/i, "") };
@@ -49,6 +50,10 @@ function relativeDate(d) {
   return formatDate(d);
 }
 
+function formatDateTime(iso) {
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 // ─── Logo ────────────────────────────────────────────────────
 function LogoIcon({ size = 16, color = "white" }) {
   return (
@@ -69,8 +74,7 @@ function Toast({ msg, onDone }) {
       zIndex: 9999, background: "#1c2033", color: "white",
       padding: "10px 20px", borderRadius: "var(--r-full)",
       fontSize: 13, fontWeight: 500, boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-      animation: "fadeUp 0.2s ease both", whiteSpace: "nowrap",
-      display: "flex", alignItems: "center", gap: 8,
+      whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8,
     }}>
       <span style={{ color: "#5c96ff" }}>✓</span>{msg}
     </div>
@@ -85,6 +89,22 @@ function Tag({ label }) {
       padding: "2px 10px", borderRadius: "var(--r-full)",
       background: "#e8f0ff", color: "#2970ff", letterSpacing: "0.02em",
     }}>{label}</span>
+  );
+}
+
+// ─── ActionBtn ───────────────────────────────────────────────
+function ActionBtn({ label, onClick, active, danger }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{
+        background: hov ? (danger ? "#fff0f0" : "#f0f5ff") : "white",
+        border: "1px solid #dde5f7", borderRadius: "var(--r-full)",
+        padding: "6px 14px", fontSize: 12, fontWeight: 600,
+        color: danger ? (hov ? "#dc2626" : "#8fa3cc") : active ? "#2970ff" : "#6680aa",
+        cursor: "pointer", transition: "all 0.15s",
+      }}>{label}</button>
   );
 }
 
@@ -128,8 +148,105 @@ function SidebarItem({ entry, active, onClick }) {
   );
 }
 
+// ─── Thread Section ──────────────────────────────────────────
+function ThreadSection({ entry, onUpdate }) {
+  const [threads, setThreads] = useState(entry.threads || []);
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const textRef = useRef();
+
+  useEffect(() => { setThreads(entry.threads || []); }, [entry.id]);
+
+  async function addNote() {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    const note = { id: Date.now().toString(), text: text.trim(), createdAt: new Date().toISOString() };
+    const updated = [...threads, note];
+    setThreads(updated);
+    setText("");
+    try {
+      const { entry: e } = await api.updateEntry(entry.id, { threads: updated });
+      onUpdate(e);
+    } finally { setSaving(false); }
+  }
+
+  async function deleteNote(id) {
+    const updated = threads.filter(t => t.id !== id);
+    setThreads(updated);
+    try {
+      const { entry: e } = await api.updateEntry(entry.id, { threads: updated });
+      onUpdate(e);
+    } catch {}
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(); }
+  }
+
+  return (
+    <div style={{ marginTop: 40, borderTop: "1px solid #eef2fb", paddingTop: 28, paddingBottom: 40 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16 }}>
+        Anotações · {threads.length}
+      </div>
+
+      {/* Thread messages */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        {threads.length === 0 && (
+          <div style={{ fontSize: 13, color: "#b8c7e8", fontStyle: "italic", padding: "8px 0" }}>
+            Nenhuma anotação ainda. Adicione pensamentos, atualizações ou contexto abaixo.
+          </div>
+        )}
+        {threads.map(t => (
+          <div key={t.id} style={{
+            background: "#f4f7ff", border: "1px solid #e4ecff",
+            borderRadius: 14, padding: "12px 16px",
+            position: "relative",
+          }}>
+            <p style={{ fontSize: 14, color: "#05102a", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, paddingRight: 24 }}>{t.text}</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: "#a0b4d4" }}>{formatDateTime(t.createdAt)}</span>
+              <button onClick={() => deleteNote(t.id)} style={{
+                background: "none", border: "none", fontSize: 15, color: "#c0cfea",
+                cursor: "pointer", lineHeight: 1, padding: "0 2px",
+              }}>×</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <textarea
+          ref={textRef}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={2}
+          placeholder="Adicionar anotação… (Enter para enviar, Shift+Enter para nova linha)"
+          style={{
+            flex: 1, border: "1.5px solid #dde5f7", borderRadius: 12,
+            padding: "10px 14px", fontSize: 13, resize: "none",
+            outline: "none", fontFamily: "inherit", color: "#05102a",
+            lineHeight: 1.6, transition: "border-color 0.15s",
+            background: "#fafcff",
+          }}
+          onFocus={e => e.target.style.borderColor = "#2970ff"}
+          onBlur={e => e.target.style.borderColor = "#dde5f7"}
+        />
+        <button onClick={addNote} disabled={!text.trim() || saving} style={{
+          background: text.trim() ? "#2970ff" : "#dde5f7",
+          border: "none", borderRadius: 10, padding: "10px 16px",
+          color: "white", fontSize: 16, fontWeight: 700,
+          cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
+          flexShrink: 0,
+        }}>↑</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Entry Content View ──────────────────────────────────────
-function EntryView({ entry, related, onEdit, onPin, onDelete }) {
+function EntryView({ entry, related, onEdit, onPin, onDelete, onUpdate }) {
   const meta = TYPE[entry.type] || TYPE.note;
   const isLang = entry.type.startsWith("lang_");
   const hasDate = entry.type === "event" || entry.type === "reminder";
@@ -159,8 +276,7 @@ function EntryView({ entry, related, onEdit, onPin, onDelete }) {
       {/* Title */}
       <h1 style={{
         fontFamily: "var(--font-serif)", fontSize: 28, fontWeight: 600,
-        color: "#05102a", lineHeight: 1.25, marginBottom: 20,
-        letterSpacing: "-0.01em",
+        color: "#05102a", lineHeight: 1.25, marginBottom: 20, letterSpacing: "-0.01em",
       }}>{entry.title}</h1>
 
       {/* Content */}
@@ -170,7 +286,7 @@ function EntryView({ entry, related, onEdit, onPin, onDelete }) {
       }}>{entry.content}</p>
 
       {/* Tags */}
-      {entry.tags.length > 0 && (
+      {entry.tags?.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 32 }}>
           {entry.tags.map(t => <Tag key={t} label={`#${t}`} />)}
         </div>
@@ -179,13 +295,13 @@ function EntryView({ entry, related, onEdit, onPin, onDelete }) {
       {/* Date footer */}
       <div style={{
         fontSize: 12, color: "#8fa3cc",
-        borderTop: "1px solid #eef2fb", paddingTop: 16, marginBottom: 32,
+        borderTop: "1px solid #eef2fb", paddingTop: 16, marginBottom: 8,
       }}>{formatDate(entry.date)}</div>
 
       {/* Related */}
       {related && related.length > 0 && (
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, marginTop: 24 }}>
             Relacionadas por tags
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -206,22 +322,10 @@ function EntryView({ entry, related, onEdit, onPin, onDelete }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function ActionBtn({ label, onClick, active, danger }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button onClick={onClick}
-      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{
-        background: hov ? (danger ? "#fff0f0" : "#f0f5ff") : "white",
-        border: "1px solid #dde5f7", borderRadius: "var(--r-full)",
-        padding: "6px 14px", fontSize: 12, fontWeight: 600,
-        color: danger ? (hov ? "#dc2626" : "#8fa3cc") : active ? "#2970ff" : "#6680aa",
-        cursor: "pointer", transition: "all 0.15s",
-      }}>{label}</button>
+      {/* Thread */}
+      <ThreadSection entry={entry} onUpdate={onUpdate} />
+    </div>
   );
 }
 
@@ -267,7 +371,6 @@ function EditForm({ entry, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Tipo */}
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Tipo</FieldLabel>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -310,7 +413,106 @@ function FieldLabel({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>{children}</div>;
 }
 
-// ─── Input Bar (Claude-style) ────────────────────────────────
+// ─── Cards View (Masonry) ────────────────────────────────────
+function CardsView({ entries, onOpen }) {
+  const [hovId, setHovId] = useState(null);
+
+  if (entries.length === 0) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#b8c7e8", fontSize: 14 }}>
+        Nenhuma entrada para exibir
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "28px 24px", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 20 }}>
+        {entries.length} {entries.length === 1 ? "entrada" : "entradas"}
+      </div>
+      {/* Masonry via CSS columns */}
+      <div style={{ columns: "280px", columnGap: 14 }}>
+        {entries.map(entry => {
+          const meta = TYPE[entry.type] || TYPE.note;
+          const isLang = entry.type.startsWith("lang_");
+          const hov = hovId === entry.id;
+          const threadCount = entry.threads?.length || 0;
+          return (
+            <div
+              key={entry.id}
+              onClick={() => onOpen(entry)}
+              onMouseEnter={() => setHovId(entry.id)}
+              onMouseLeave={() => setHovId(null)}
+              style={{
+                breakInside: "avoid",
+                marginBottom: 14,
+                background: hov ? "#f4f8ff" : "white",
+                border: `1.5px solid ${hov ? meta.border : "#eef2fb"}`,
+                borderRadius: 16,
+                padding: "16px 18px",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                boxShadow: hov ? "0 4px 20px rgba(41,112,255,0.1)" : "0 1px 4px rgba(10,31,78,0.05)",
+              }}
+            >
+              {/* Type badge */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  background: meta.bg, border: `1px solid ${meta.border}`,
+                  borderRadius: "var(--r-full)", padding: "2px 10px",
+                }}>
+                  <span style={{ fontSize: isLang ? 12 : 10 }}>{meta.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>{meta.label}</span>
+                </div>
+                {entry.pinned && <span style={{ marginLeft: "auto", color: "#2970ff", fontSize: 11 }}>★</span>}
+              </div>
+
+              {/* Title */}
+              <h3 style={{
+                fontSize: 14, fontWeight: 600, color: "#05102a",
+                marginBottom: 8, lineHeight: 1.4,
+                fontFamily: "var(--font-serif)",
+              }}>{entry.title}</h3>
+
+              {/* Content preview */}
+              <p style={{
+                fontSize: 12.5, color: "#6680aa", lineHeight: 1.65,
+                display: "-webkit-box", WebkitLineClamp: 4,
+                WebkitBoxOrient: "vertical", overflow: "hidden",
+                margin: 0,
+              }}>{entry.content}</p>
+
+              {/* Tags */}
+              {entry.tags?.length > 0 && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 10 }}>
+                  {entry.tags.map(t => (
+                    <span key={t} style={{
+                      fontSize: 10, padding: "2px 8px", borderRadius: "var(--r-full)",
+                      background: meta.bg, color: meta.color, fontWeight: 600,
+                    }}>#{t}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                <span style={{ fontSize: 10.5, color: "#b8c7e8" }}>{relativeDate(entry.date)}</span>
+                {threadCount > 0 && (
+                  <span style={{ fontSize: 10, color: "#8fa3cc", display: "flex", alignItems: "center", gap: 3 }}>
+                    💬 {threadCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Input Bar ───────────────────────────────────────────────
 function InputBar({ onCreated }) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -347,12 +549,8 @@ function InputBar({ onCreated }) {
   }
 
   return (
-    <div style={{
-      padding: "12px 24px 20px", background: "white", flexShrink: 0,
-      borderTop: "1px solid #eef2fb",
-    }}>
+    <div style={{ padding: "12px 24px 20px", background: "white", flexShrink: 0, borderTop: "1px solid #eef2fb" }}>
       <div style={{ maxWidth: 720, margin: "0 auto", position: "relative" }}>
-        {/* Type indicator */}
         {meta && (
           <div style={{
             position: "absolute", top: -32, left: "50%", transform: "translateX(-50%)",
@@ -360,19 +558,16 @@ function InputBar({ onCreated }) {
             borderRadius: "var(--r-full)", padding: "3px 14px",
             fontSize: 11, fontWeight: 700, color: meta.color,
             display: "flex", alignItems: "center", gap: 5,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)", animation: "fadeIn 0.15s ease",
-            whiteSpace: "nowrap", pointerEvents: "none",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)", whiteSpace: "nowrap", pointerEvents: "none",
           }}>
             <span>{meta.icon}</span>{meta.label}
           </div>
         )}
-
         <div style={{
           display: "flex", alignItems: "flex-end", gap: 10,
           background: focused ? "white" : "#f8faff",
           border: `1.5px solid ${focused ? "#2970ff" : "#dde5f7"}`,
-          borderRadius: 16,
-          padding: "12px 14px",
+          borderRadius: 16, padding: "12px 14px",
           boxShadow: focused ? "0 0 0 4px rgba(41,112,255,0.08)" : "0 2px 8px rgba(10,31,78,0.05)",
           transition: "all 0.18s",
         }}>
@@ -410,47 +605,134 @@ function InputBar({ onCreated }) {
   );
 }
 
-// ─── Home Page ───────────────────────────────────────────────
-function HomePage({ onClose, onCreated }) {
+// ─── Home Page (Claude-style) ────────────────────────────────
+function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
   const [lastCreated, setLastCreated] = useState(null);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+
   function handleCreated(entry) {
     onCreated(entry);
     setLastCreated(TYPE[entry.type]?.label || "Entrada");
     setTimeout(() => setLastCreated(null), 2500);
   }
+
+  const HINTS = [
+    { p: "evento …",   c: "#0d52c4", bg: "#dce8ff" },
+    { p: "lembrete …", c: "#0a3d99", bg: "#d0dfff" },
+    { p: "frances …",  c: "#0055A4", bg: "#e8eeff" },
+    { p: "jp …",       c: "#BC002D", bg: "#ffecec" },
+  ];
+
   return (
-    <div className="home-overlay">
-      <button className="home-close" onClick={onClose}>×</button>
-      <div className="home-card">
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "#f5f7fc",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "24px 24px 40px",
+      overflowY: "auto",
+    }}>
+      {/* Close */}
+      <button onClick={onClose} style={{
+        position: "fixed", top: 20, right: 24,
+        background: "rgba(10,31,78,0.06)", border: "none", borderRadius: "50%",
+        width: 36, height: 36, fontSize: 20, cursor: "pointer",
+        color: "#8fa3cc", display: "flex", alignItems: "center", justifyContent: "center",
+        lineHeight: 1,
+      }}>×</button>
+
+      <div style={{ width: "100%", maxWidth: 640, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+
+        {/* Logo + Greeting */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 16, flexShrink: 0,
-            background: "linear-gradient(135deg, #2970ff, #091f5c)",
+            width: 72, height: 72, borderRadius: 22, margin: "0 auto 20px",
+            background: "linear-gradient(135deg, #2970ff 0%, #091f5c 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 20px rgba(41,112,255,0.3)",
-          }}><LogoIcon size={24} /></div>
-          <div>
-            <div style={{ fontFamily: "var(--font-serif)", fontSize: 26, fontWeight: 600, color: "#05102a", letterSpacing: "-0.02em" }}>Fields'</div>
-            <div style={{ fontSize: 13, color: "#8fa3cc", marginTop: 1 }}>Capture tudo. Encontre sempre.</div>
-          </div>
+            boxShadow: "0 12px 40px rgba(41,112,255,0.28)",
+          }}><LogoIcon size={32} /></div>
+          <h1 style={{
+            fontFamily: "var(--font-serif)", fontSize: 34, fontWeight: 600,
+            color: "#05102a", marginBottom: 8, letterSpacing: "-0.02em", lineHeight: 1.2,
+          }}>{greeting}, Carlos.</h1>
+          <p style={{ fontSize: 16, color: "#8fa3cc", fontWeight: 400 }}>
+            O que você quer capturar hoje?
+          </p>
         </div>
-        <div style={{ height: 1, background: "#eef2fb", margin: "12px 0 24px" }} />
-        <InputBar onCreated={handleCreated} />
-        {lastCreated && (
-          <div className="animate-fadeUp" style={{ marginTop: 10, textAlign: "center", fontSize: 13, color: "#2970ff", fontWeight: 600 }}>
-            ✓ {lastCreated} criada
+
+        {/* Input Card */}
+        <div style={{
+          width: "100%", background: "white", borderRadius: 20,
+          boxShadow: "0 4px 32px rgba(10,31,78,0.08)", border: "1px solid #eef2fb",
+          overflow: "hidden", marginBottom: 16,
+        }}>
+          <InputBar onCreated={handleCreated} />
+          {lastCreated && (
+            <div style={{ textAlign: "center", padding: "0 24px 16px", fontSize: 13, color: "#2970ff", fontWeight: 600 }}>
+              ✓ {lastCreated} criada com sucesso
+            </div>
+          )}
+        </div>
+
+        {/* Prefix hints */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 36 }}>
+          {HINTS.map(({ p, c, bg }) => (
+            <span key={p} style={{
+              fontSize: 11, fontWeight: 600, color: c, background: bg,
+              border: `1px solid ${c}30`, padding: "4px 12px", borderRadius: "var(--r-full)",
+            }}>{p}</span>
+          ))}
+          <span style={{ fontSize: 11, color: "#b8c7e8", alignSelf: "center" }}>— prefixos de tipo</span>
+        </div>
+
+        {/* Recent entries */}
+        {recentEntries.length > 0 && (
+          <div style={{ width: "100%" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#b8c7e8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, textAlign: "center" }}>
+              Recentes
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {recentEntries.slice(0, 5).map(e => {
+                const meta = TYPE[e.type] || TYPE.note;
+                const isLang = e.type.startsWith("lang_");
+                return (
+                  <div
+                    key={e.id}
+                    onClick={() => { onOpenEntry(e); onClose(); }}
+                    style={{
+                      padding: "12px 16px", borderRadius: 14,
+                      background: "white", border: "1px solid #eef2fb",
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.12s",
+                    }}
+                    onMouseEnter={ev => { ev.currentTarget.style.background = "#f4f7ff"; ev.currentTarget.style.borderColor = "#c4d9ff"; }}
+                    onMouseLeave={ev => { ev.currentTarget.style.background = "white"; ev.currentTarget.style.borderColor = "#eef2fb"; }}
+                  >
+                    <span style={{ fontSize: isLang ? 16 : 13, color: meta.color, flexShrink: 0 }}>{meta.icon}</span>
+                    <span style={{ flex: 1, fontSize: 14, color: "#05102a", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.title}</span>
+                    {e.threads?.length > 0 && <span style={{ fontSize: 11, color: "#b8c7e8" }}>💬 {e.threads.length}</span>}
+                    <span style={{ fontSize: 11, color: "#b8c7e8", flexShrink: 0 }}>{relativeDate(e.date)}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
-        <div className="home-hints" style={{ marginTop: 16 }}>
-          {[
-            { p: "evento …",   c: "#0d52c4" }, { p: "lembrete …", c: "#0a3d99" },
-            { p: "frances …",  c: "#0055A4" }, { p: "jp …",       c: "#BC002D" },
-          ].map(({ p, c }) => (
-            <span key={p} style={{ fontSize: 11, fontWeight: 600, color: c, background: `${c}12`, border: `1px solid ${c}28`, padding: "3px 10px", borderRadius: "var(--r-full)" }}>{p}</span>
-          ))}
-          <span style={{ fontSize: 11, color: "#8fa3cc", alignSelf: "center", marginLeft: 4 }}>— prefixos de tipo</span>
-        </div>
-        <button className="home-workspace-btn" onClick={onClose}>Abrir workspace →</button>
+
+        {/* Workspace link */}
+        <button onClick={onClose} style={{
+          marginTop: 24, background: "transparent", border: "none",
+          fontSize: 13, color: "#8fa3cc", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 4,
+          padding: "8px 16px", borderRadius: "var(--r-full)",
+          transition: "color 0.15s",
+        }}
+          onMouseEnter={e => e.currentTarget.style.color = "#2970ff"}
+          onMouseLeave={e => e.currentTarget.style.color = "#8fa3cc"}
+        >
+          Abrir workspace →
+        </button>
       </div>
     </div>
   );
@@ -466,6 +748,7 @@ export default function App() {
   const [activeEntry, setActiveEntry]     = useState(null);
   const [activeRelated, setActiveRelated] = useState([]);
   const [editing, setEditing]             = useState(false);
+  const [showCards, setShowCards]         = useState(false);
   const [toast, setToast]                 = useState(null);
   const [loading, setLoading]             = useState(true);
   const [isMobile, setIsMobile]           = useState(window.innerWidth < 768);
@@ -495,7 +778,7 @@ export default function App() {
   }, [filter, search]);
 
   async function openEntry(entry) {
-    setActiveEntry(entry); setEditing(false);
+    setActiveEntry(entry); setEditing(false); setShowCards(false);
     try {
       const { entry: full, related } = await api.getEntry(entry.id);
       setActiveEntry(full); setActiveRelated(related);
@@ -535,13 +818,25 @@ export default function App() {
     loadAll({ type: filter, search });
   }
 
+  function handleThreadUpdate(updated) {
+    setActiveEntry(updated);
+    setEntries(prev => prev.map(e => e.id === updated.id ? updated : e));
+  }
+
   const isLang = filter === "lang_fr" || filter === "lang_jp";
-  const showSidebar = !isMobile || !activeEntry;
-  const showMain    = !isMobile || !!activeEntry;
+  const showSidebar = !isMobile || (!activeEntry && !showCards);
+  const showMain    = !isMobile || !!activeEntry || showCards;
 
   return (
     <div style={{ height: "100vh", display: "flex", overflow: "hidden", background: "#f8faff" }}>
-      {showHome && <HomePage onClose={() => setShowHome(false)} onCreated={handleCreated} />}
+      {showHome && (
+        <HomePage
+          onClose={() => setShowHome(false)}
+          onCreated={handleCreated}
+          recentEntries={entries}
+          onOpenEntry={openEntry}
+        />
+      )}
 
       {/* ── SIDEBAR ── */}
       {showSidebar && (
@@ -559,6 +854,12 @@ export default function App() {
               display: "flex", alignItems: "center", justifyContent: "center",
             }}><LogoIcon size={14} /></div>
             <span style={{ fontFamily: "var(--font-serif)", fontSize: 17, fontWeight: 600, color: "white", letterSpacing: "-0.01em" }}>Fields'</span>
+            {/* Home button */}
+            <button onClick={() => setShowHome(true)} style={{
+              marginLeft: "auto", background: "rgba(255,255,255,0.08)", border: "none",
+              borderRadius: 6, padding: "4px 8px", fontSize: 11, color: "rgba(255,255,255,0.5)",
+              cursor: "pointer",
+            }}>⌂</button>
           </div>
 
           {/* Search */}
@@ -584,8 +885,7 @@ export default function App() {
               {FILTERS.map(f => (
                 <button key={f.key} onClick={() => { setFilter(f.key); setShowLangMenu(false); }} style={{
                   background: filter === f.key ? "rgba(41,112,255,0.25)" : "transparent",
-                  border: "none",
-                  borderRadius: "var(--r-full)", padding: "4px 10px",
+                  border: "none", borderRadius: "var(--r-full)", padding: "4px 10px",
                   fontSize: 11, fontWeight: 600,
                   color: filter === f.key ? "#5c96ff" : "rgba(255,255,255,0.4)",
                   cursor: "pointer", transition: "all 0.15s",
@@ -619,7 +919,7 @@ export default function App() {
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
             {loading && (
               <div style={{ textAlign: "center", padding: "40px 20px", color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
-                <div style={{ animation: "pulse 1s infinite", marginBottom: 8 }}>◈</div>Carregando…
+                <div style={{ marginBottom: 8 }}>◈</div>Carregando…
               </div>
             )}
             {!loading && entries.length === 0 && (
@@ -628,7 +928,7 @@ export default function App() {
               </div>
             )}
             {entries.map(e => (
-              <SidebarItem key={e.id} entry={e} active={activeEntry?.id === e.id} onClick={() => openEntry(e)} />
+              <SidebarItem key={e.id} entry={e} active={activeEntry?.id === e.id && !showCards} onClick={() => openEntry(e)} />
             ))}
           </div>
         </div>
@@ -641,11 +941,10 @@ export default function App() {
           {/* Top bar */}
           <div style={{
             height: 52, flexShrink: 0, borderBottom: "1px solid #eef2fb",
-            display: "flex", alignItems: "center", padding: "0 24px",
-            gap: 12,
+            display: "flex", alignItems: "center", padding: "0 24px", gap: 12,
           }}>
-            {isMobile && activeEntry && (
-              <button onClick={() => { setActiveEntry(null); setEditing(false); }} style={{
+            {isMobile && (activeEntry || showCards) && (
+              <button onClick={() => { setActiveEntry(null); setEditing(false); setShowCards(false); }} style={{
                 background: "#f0f5ff", border: "none", borderRadius: "var(--r-full)",
                 padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#2970ff", cursor: "pointer",
               }}>← Voltar</button>
@@ -660,7 +959,24 @@ export default function App() {
                 Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "#8fa3cc", letterSpacing: "0.1em", textTransform: "uppercase" }}>workspace</span>
               </span>
             </div>
-            {activeEntry && !isMobile && (
+
+            {/* Cards toggle button */}
+            <button
+              onClick={() => { setShowCards(v => !v); if (!showCards) setActiveEntry(null); }}
+              style={{
+                background: showCards ? "#e8f0ff" : "transparent",
+                border: `1px solid ${showCards ? "#c4d9ff" : "#dde5f7"}`,
+                borderRadius: "var(--r-full)", padding: "6px 14px",
+                fontSize: 12, fontWeight: 600,
+                color: showCards ? "#2970ff" : "#6680aa",
+                cursor: "pointer", transition: "all 0.15s",
+                display: "flex", alignItems: "center", gap: 5,
+              }}
+            >
+              ⊞ Cards
+            </button>
+
+            {activeEntry && !showCards && !isMobile && (
               <span style={{ fontSize: 12, color: "#b8c7e8" }}>
                 {activeEntry.title.slice(0, 40)}{activeEntry.title.length > 40 ? "…" : ""}
               </span>
@@ -669,7 +985,14 @@ export default function App() {
 
           {/* Content */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {!activeEntry && (
+
+            {/* Cards view */}
+            {showCards && (
+              <CardsView entries={entries} onOpen={openEntry} />
+            )}
+
+            {/* Empty state */}
+            {!showCards && !activeEntry && (
               <div style={{
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 height: "100%", gap: 16, padding: 40,
@@ -695,23 +1018,26 @@ export default function App() {
               </div>
             )}
 
-            {activeEntry && !editing && (
+            {/* Entry view */}
+            {!showCards && activeEntry && !editing && (
               <EntryView
                 entry={activeEntry}
                 related={activeRelated}
                 onEdit={() => setEditing(true)}
                 onPin={() => handlePin(activeEntry.id, !activeEntry.pinned)}
                 onDelete={() => handleDelete(activeEntry.id)}
+                onUpdate={handleThreadUpdate}
               />
             )}
 
-            {activeEntry && editing && (
+            {/* Edit form */}
+            {!showCards && activeEntry && editing && (
               <EditForm entry={activeEntry} onSave={handleUpdate} onCancel={() => setEditing(false)} />
             )}
           </div>
 
           {/* Input */}
-          <InputBar onCreated={handleCreated} />
+          {!showCards && <InputBar onCreated={handleCreated} />}
         </div>
       )}
 

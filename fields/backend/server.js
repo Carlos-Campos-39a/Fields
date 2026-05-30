@@ -222,7 +222,7 @@ app.patch("/api/entries/:id", (req, res) => {
   const idx = db.entries.findIndex((e) => e.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: "Not found" });
 
-  const allowed = ["type", "title", "content", "tags", "date", "time", "pinned"];
+  const allowed = ["type", "title", "content", "tags", "date", "time", "pinned", "threads"];
   allowed.forEach((field) => {
     if (req.body[field] !== undefined) db.entries[idx][field] = req.body[field];
   });
