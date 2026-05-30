@@ -57,16 +57,33 @@ function formatDateTime(iso) {
 // ─── Logo ────────────────────────────────────────────────────
 function LogoIcon({ size = 16, color = "white" }) {
   return (
-    <svg width={size} height={Math.round(size * 1.15)} viewBox="0 0 30 34" fill="none">
-      {/* Vertical stroke */}
-      <path d="M7 31 L7 3" stroke={color} strokeWidth="3.5" strokeLinecap="round"/>
-      {/* Top horizontal bar */}
-      <path d="M7 3 L23 3" stroke={color} strokeWidth="3.5" strokeLinecap="round"/>
-      {/* Middle bar — gentle upward arc, like a horizon / open field */}
-      <path d="M7 16 Q15 12.5 22 16" stroke={color} strokeWidth="3" strokeLinecap="round" fill="none"/>
-      {/* Two floating dots — stars / sparks of imagination */}
-      <circle cx="26.5" cy="2.5" r="2" fill={color} opacity="0.65"/>
-      <circle cx="25"   cy="7.5" r="1.2" fill={color} opacity="0.38"/>
+    <svg width={Math.round(size * 1.1)} height={size} viewBox="0 0 38 34" fill="none">
+      {/*
+        Boca de dino: perfil olhando pra direita.
+        O F nasce da bocarra aberta.
+        Tudo arredondado, traço leve.
+      */}
+
+      {/* Mandíbula superior — curva da nuca até a ponta do focinho */}
+      <path
+        d="M5 32 L5 14 Q5 4 14 4 L25 4 Q32 4 32 11 L32 15 Q32 19 27 19 L9 19"
+        stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+      />
+
+      {/* Mandíbula inferior */}
+      <path
+        d="M5 24 L19 24 Q25 24 25 28 Q25 32 20 32 L5 32"
+        stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+      />
+
+      {/* Dentinhos redondos na mandíbula superior */}
+      <circle cx="14.5" cy="4"   r="1.6" fill={color} opacity="0.9"/>
+      <circle cx="19.5" cy="3.2" r="1.6" fill={color} opacity="0.9"/>
+      <circle cx="24.5" cy="4"   r="1.6" fill={color} opacity="0.9"/>
+
+      {/* Olhinho */}
+      <circle cx="29" cy="9" r="2.4" fill={color} opacity="0.85"/>
+      <circle cx="29" cy="9" r="1"   fill={color} opacity="0.3"/>
     </svg>
   );
 }
