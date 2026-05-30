@@ -55,57 +55,19 @@ function formatDateTime(iso) {
 }
 
 // ─── Logo ────────────────────────────────────────────────────
-// O F É o dino: cabeça no canto superior, boca aberta entre os dois braços,
-// corpo descendo. Traço arredondado, olhinho dentro da cabeça.
+// Meteoro: cabeça circular com F dentro + rastro diagonal
 function LogoIcon({ size = 16, color = "white" }) {
   return (
-    <svg width={Math.round(size * 0.85)} height={size} viewBox="0 0 26 32" fill="none">
-      {/*
-        Silhueta do F traçada como contorno único.
-        Lendo como dino de perfil (olhando pra direita):
-          - nuca/costas = lado esquerdo vertical
-          - cabeça = canto superior, transicionando pro maxilar superior
-          - maxilar superior = braço de cima do F
-          - boca aberta = espaço entre os dois braços
-          - maxilar inferior = braço do meio do F
-          - corpo/cauda = parte de baixo do traço vertical
-      */}
-      <path
-        d="
-          M 5.5 2
-          L 19 2
-          Q 24 2 24 7
-          L 24 9.5
-          Q 24 13 19 13
-          L 9.5 13
-          Q 8.5 13 8.5 14
-          L 8.5 17
-          Q 8.5 18 9.5 18
-          L 16.5 18
-          Q 21 18 21 22
-          L 21 24.5
-          Q 21 28 16.5 28
-          L 9.5 28
-          Q 8.5 28 8.5 29
-          L 8.5 30.5
-          Q 8.5 32 7 32
-          L 4.5 32
-          Q 3 32 3 30.5
-          L 3 4
-          Q 3 2 5.5 2
-          Z
-        "
-        stroke={color}
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Olhinho — dentro da cabeça, no braço superior */}
-      <ellipse cx="19" cy="6.5" rx="2" ry="2.2"
-        stroke={color} strokeWidth="1.4" opacity="0.9"/>
-      <circle cx="19.4" cy="7" r="0.75"
-        fill={color} opacity="0.6"/>
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      {/* Rastro do meteoro — 3 riscos diagonais à esquerda */}
+      <line x1="1"  y1="8"  x2="10" y2="16" stroke={color} strokeWidth="2"   strokeLinecap="round" opacity="0.55"/>
+      <line x1="2"  y1="4"  x2="9"  y2="12" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.32"/>
+      <line x1="0"  y1="14" x2="8"  y2="21" stroke={color} strokeWidth="1"   strokeLinecap="round" opacity="0.2"/>
+      {/* Cabeça do meteoro */}
+      <circle cx="20" cy="18" r="10.5" stroke={color} strokeWidth="1.8"/>
+      {/* F estilizado dentro do círculo */}
+      <path d="M16 24 L16 12 M16 12 L24 12 M16 18 L22 18"
+            stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -121,7 +83,7 @@ function Toast({ msg, onDone }) {
       fontSize: 13, fontWeight: 500, boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
       whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8,
     }}>
-      <span style={{ color: "#5c96ff" }}>✓</span>{msg}
+      <span style={{ color: "#E8602C" }}>✓</span>{msg}
     </div>
   );
 }
@@ -132,7 +94,7 @@ function Tag({ label }) {
     <span style={{
       display: "inline-block", fontSize: 11, fontWeight: 600,
       padding: "2px 10px", borderRadius: "var(--r-full)",
-      background: "#e8f0ff", color: "#2970ff", letterSpacing: "0.02em",
+      background: "#fdf0ea", color: "#E8602C", letterSpacing: "0.02em",
     }}>{label}</span>
   );
 }
@@ -144,10 +106,10 @@ function ActionBtn({ label, onClick, active, danger }) {
     <button onClick={onClick}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
-        background: hov ? (danger ? "#fff0f0" : "#f0f5ff") : "white",
+        background: hov ? (danger ? "#fff0f0" : "#fdf0ea") : "white",
         border: "1px solid #dde5f7", borderRadius: "var(--r-full)",
         padding: "6px 14px", fontSize: 12, fontWeight: 600,
-        color: danger ? (hov ? "#dc2626" : "#8fa3cc") : active ? "#2970ff" : "#6680aa",
+        color: danger ? (hov ? "#dc2626" : "#8fa3cc") : active ? "#E8602C" : "#6680aa",
         cursor: "pointer", transition: "all 0.15s",
       }}>{label}</button>
   );
@@ -165,15 +127,15 @@ function SidebarItem({ entry, active, onClick }) {
       onMouseLeave={() => setHov(false)}
       style={{
         padding: "9px 14px", cursor: "pointer",
-        background: active ? "rgba(41,112,255,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
-        borderLeft: `3px solid ${active ? "#2970ff" : "transparent"}`,
+        background: active ? "rgba(232,96,44,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
+        borderLeft: `3px solid ${active ? "#E8602C" : "transparent"}`,
         transition: "all 0.12s",
         borderRadius: "0 8px 8px 0",
         marginRight: 8,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
-        <span style={{ fontSize: isLang ? 13 : 10, color: active ? "#5c96ff" : "rgba(255,255,255,0.4)" }}>
+        <span style={{ fontSize: isLang ? 13 : 10, color: active ? "#f0956a" : "rgba(255,255,255,0.4)" }}>
           {meta.icon}
         </span>
         <span style={{
@@ -182,7 +144,7 @@ function SidebarItem({ entry, active, onClick }) {
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           maxWidth: 170,
         }}>{entry.title}</span>
-        {entry.pinned && <span style={{ color: "#5c96ff", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>★</span>}
+        {entry.pinned && <span style={{ color: "#E8602C", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>★</span>}
       </div>
       <div style={{
         fontSize: 11, color: "rgba(255,255,255,0.3)",
@@ -275,11 +237,11 @@ function ThreadSection({ entry, onUpdate }) {
             lineHeight: 1.6, transition: "border-color 0.15s",
             background: "#fafcff",
           }}
-          onFocus={e => e.target.style.borderColor = "#2970ff"}
+          onFocus={e => e.target.style.borderColor = "#E8602C"}
           onBlur={e => e.target.style.borderColor = "#dde5f7"}
         />
         <button onClick={addNote} disabled={!text.trim() || saving} style={{
-          background: text.trim() ? "#2970ff" : "#dde5f7",
+          background: text.trim() ? "#E8602C" : "#dde5f7",
           border: "none", borderRadius: 10, padding: "10px 16px",
           color: "white", fontSize: 16, fontWeight: 700,
           cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
@@ -405,11 +367,11 @@ function EditForm({ entry, onSave, onCancel }) {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px 24px", animation: "fadeUp 0.2s ease both" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#2970ff", letterSpacing: "0.08em", textTransform: "uppercase" }}>Editando</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#E8602C", letterSpacing: "0.08em", textTransform: "uppercase" }}>Editando</span>
         <div style={{ display: "flex", gap: 8 }}>
           <ActionBtn label="Cancelar" onClick={onCancel} />
           <button onClick={save} disabled={saving} style={{
-            background: "#2970ff", border: "none", borderRadius: "var(--r-full)",
+            background: "#E8602C", border: "none", borderRadius: "var(--r-full)",
             padding: "7px 20px", fontSize: 12, fontWeight: 600, color: "white",
             cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1,
           }}>{saving ? "Salvando…" : "Salvar"}</button>
@@ -497,7 +459,7 @@ function CardsView({ entries, onOpen }) {
                 padding: "16px 18px",
                 cursor: "pointer",
                 transition: "all 0.15s",
-                boxShadow: hov ? "0 4px 20px rgba(41,112,255,0.1)" : "0 1px 4px rgba(10,31,78,0.05)",
+                boxShadow: hov ? "0 4px 20px rgba(232,96,44,0.1)" : "0 1px 4px rgba(10,31,78,0.05)",
               }}
             >
               {/* Type badge */}
@@ -510,7 +472,7 @@ function CardsView({ entries, onOpen }) {
                   <span style={{ fontSize: isLang ? 12 : 10 }}>{meta.icon}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>{meta.label}</span>
                 </div>
-                {entry.pinned && <span style={{ marginLeft: "auto", color: "#2970ff", fontSize: 11 }}>★</span>}
+                {entry.pinned && <span style={{ marginLeft: "auto", color: "#E8602C", fontSize: 11 }}>★</span>}
               </div>
 
               {/* Title */}
@@ -611,9 +573,9 @@ function InputBar({ onCreated }) {
         <div style={{
           display: "flex", alignItems: "flex-end", gap: 10,
           background: focused ? "white" : "#f8faff",
-          border: `1.5px solid ${focused ? "#2970ff" : "#dde5f7"}`,
+          border: `1.5px solid ${focused ? "#E8602C" : "#dde5f7"}`,
           borderRadius: 16, padding: "12px 14px",
-          boxShadow: focused ? "0 0 0 4px rgba(41,112,255,0.08)" : "0 2px 8px rgba(10,31,78,0.05)",
+          boxShadow: focused ? "0 0 0 4px rgba(232,96,44,0.08)" : "0 2px 8px rgba(10,31,78,0.05)",
           transition: "all 0.18s",
         }}>
           <textarea
@@ -633,11 +595,11 @@ function InputBar({ onCreated }) {
           />
           <button onClick={submit} disabled={!text.trim() || loading} style={{
             width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-            background: text.trim() ? "#2970ff" : "#dde5f7",
+            background: text.trim() ? "#E8602C" : "#dde5f7",
             border: "none", color: "white", fontSize: 15,
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
-            boxShadow: text.trim() ? "0 2px 8px rgba(41,112,255,0.35)" : "none",
+            boxShadow: text.trim() ? "0 2px 8px rgba(232,96,44,0.35)" : "none",
           }}>
             {loading ? <span style={{ fontSize: 11 }}>…</span> : "↑"}
           </button>
@@ -681,9 +643,9 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
       {/* Close */}
       <button onClick={onClose} style={{
         position: "fixed", top: 20, right: 24,
-        background: "rgba(10,31,78,0.06)", border: "none", borderRadius: "50%",
+        background: "rgba(232,96,44,0.08)", border: "none", borderRadius: "50%",
         width: 36, height: 36, fontSize: 20, cursor: "pointer",
-        color: "#8fa3cc", display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#E8602C", display: "flex", alignItems: "center", justifyContent: "center",
         lineHeight: 1,
       }}>×</button>
 
@@ -695,7 +657,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
             width: 72, height: 72, borderRadius: 22, margin: "0 auto 20px",
             background: "linear-gradient(135deg, #E8602C 0%, #1a1a1a 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 12px 40px rgba(41,112,255,0.28)",
+            boxShadow: "0 12px 40px rgba(232,96,44,0.28)",
           }}><LogoIcon size={32} /></div>
           <h1 style={{
             fontFamily: "var(--font-serif)", fontSize: 34, fontWeight: 600,
@@ -714,7 +676,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
         }}>
           <InputBar onCreated={handleCreated} />
           {lastCreated && (
-            <div style={{ textAlign: "center", padding: "0 24px 16px", fontSize: 13, color: "#2970ff", fontWeight: 600 }}>
+            <div style={{ textAlign: "center", padding: "0 24px 16px", fontSize: 13, color: "#E8602C", fontWeight: 600 }}>
               ✓ {lastCreated} criada com sucesso
             </div>
           )}
@@ -751,7 +713,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
                       transition: "all 0.12s",
                     }}
-                    onMouseEnter={ev => { ev.currentTarget.style.background = "#f4f7ff"; ev.currentTarget.style.borderColor = "#c4d9ff"; }}
+                    onMouseEnter={ev => { ev.currentTarget.style.background = "#fdf0ea"; ev.currentTarget.style.borderColor = "#f5c4a8"; }}
                     onMouseLeave={ev => { ev.currentTarget.style.background = "white"; ev.currentTarget.style.borderColor = "#eef2fb"; }}
                   >
                     <span style={{ fontSize: isLang ? 16 : 13, color: meta.color, flexShrink: 0 }}>{meta.icon}</span>
@@ -773,7 +735,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
           padding: "8px 16px", borderRadius: "var(--r-full)",
           transition: "color 0.15s",
         }}
-          onMouseEnter={e => e.currentTarget.style.color = "#2970ff"}
+          onMouseEnter={e => e.currentTarget.style.color = "#E8602C"}
           onMouseLeave={e => e.currentTarget.style.color = "#8fa3cc"}
         >
           Abrir workspace →
@@ -929,10 +891,10 @@ export default function App() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
               {FILTERS.map(f => (
                 <button key={f.key} onClick={() => { setFilter(f.key); setShowLangMenu(false); }} style={{
-                  background: filter === f.key ? "rgba(41,112,255,0.25)" : "transparent",
+                  background: filter === f.key ? "rgba(232,96,44,0.25)" : "transparent",
                   border: "none", borderRadius: "var(--r-full)", padding: "4px 10px",
                   fontSize: 11, fontWeight: 600,
-                  color: filter === f.key ? "#5c96ff" : "rgba(255,255,255,0.4)",
+                  color: filter === f.key ? "#f0956a" : "rgba(255,255,255,0.4)",
                   cursor: "pointer", transition: "all 0.15s",
                 }}>{f.label}</button>
               ))}
@@ -990,8 +952,8 @@ export default function App() {
           }}>
             {isMobile && (activeEntry || showCards) && (
               <button onClick={() => { setActiveEntry(null); setEditing(false); setShowCards(false); }} style={{
-                background: "#f0f5ff", border: "none", borderRadius: "var(--r-full)",
-                padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#2970ff", cursor: "pointer",
+                background: "#fdf0ea", border: "none", borderRadius: "var(--r-full)",
+                padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#E8602C", cursor: "pointer",
               }}>← Voltar</button>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
@@ -1009,11 +971,11 @@ export default function App() {
             <button
               onClick={() => { setShowCards(v => !v); if (!showCards) setActiveEntry(null); }}
               style={{
-                background: showCards ? "#e8f0ff" : "transparent",
-                border: `1px solid ${showCards ? "#c4d9ff" : "#dde5f7"}`,
+                background: showCards ? "#fdf0ea" : "transparent",
+                border: `1px solid ${showCards ? "#f5c4a8" : "#dde5f7"}`,
                 borderRadius: "var(--r-full)", padding: "6px 14px",
                 fontSize: 12, fontWeight: 600,
-                color: showCards ? "#2970ff" : "#6680aa",
+                color: showCards ? "#E8602C" : "#6680aa",
                 cursor: "pointer", transition: "all 0.15s",
                 display: "flex", alignItems: "center", gap: 5,
               }}
@@ -1021,10 +983,35 @@ export default function App() {
               ⊞ Cards
             </button>
 
-            {activeEntry && !showCards && !isMobile && (
-              <span style={{ fontSize: 12, color: "#b8c7e8" }}>
-                {activeEntry.title.slice(0, 40)}{activeEntry.title.length > 40 ? "…" : ""}
-              </span>
+            {activeEntry && !showCards && (
+              <>
+                {!isMobile && (
+                  <span style={{ fontSize: 12, color: "#b8c7e8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {activeEntry.title.slice(0, 40)}{activeEntry.title.length > 40 ? "…" : ""}
+                  </span>
+                )}
+                {/* Prev / Next navigation */}
+                {(() => {
+                  const idx = entries.findIndex(e => e.id === activeEntry.id);
+                  const canPrev = idx > 0;
+                  const canNext = idx >= 0 && idx < entries.length - 1;
+                  const navBtn = (label, onClick, enabled) => (
+                    <button onClick={onClick} disabled={!enabled} style={{
+                      background: "transparent", border: "1px solid #dde5f7",
+                      borderRadius: "var(--r-full)", padding: "5px 12px",
+                      fontSize: 13, fontWeight: 600,
+                      color: enabled ? "#6680aa" : "#d0d8e8",
+                      cursor: enabled ? "pointer" : "default", transition: "all 0.15s",
+                    }}>{label}</button>
+                  );
+                  return (
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {navBtn("←", () => openEntry(entries[idx - 1]), canPrev)}
+                      {navBtn("→", () => openEntry(entries[idx + 1]), canNext)}
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
 
@@ -1046,7 +1033,7 @@ export default function App() {
                   width: 64, height: 64, borderRadius: 18,
                   background: "linear-gradient(135deg, #E8602C, #1a1a1a)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 8px 32px rgba(41,112,255,0.2)",
+                  boxShadow: "0 8px 32px rgba(232,96,44,0.2)",
                 }}><LogoIcon size={28} /></div>
                 <div style={{ textAlign: "center" }}>
                   <p style={{ fontSize: 18, fontWeight: 600, color: "#05102a", fontFamily: "var(--font-serif)", marginBottom: 6 }}>Fields' Workspace</p>
