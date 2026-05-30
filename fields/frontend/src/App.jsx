@@ -76,10 +76,11 @@ function Toast({ msg, onDone }) {
   return (
     <div style={{
       position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
-      zIndex: 9999, background: "#1a1a1a", color: "white",
+      zIndex: 9999, background: "#2a2a2a", color: "white",
       padding: "10px 20px", borderRadius: "var(--r-full)",
-      fontSize: 13, fontWeight: 500, boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+      fontSize: 13, fontWeight: 500, boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
       whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8,
+      border: "1px solid rgba(255,255,255,0.1)",
     }}>
       <span style={{ color: "#E8602C" }}>✓</span>{msg}
     </div>
@@ -92,7 +93,8 @@ function Tag({ label }) {
     <span style={{
       display: "inline-block", fontSize: 11, fontWeight: 600,
       padding: "2px 10px", borderRadius: "var(--r-full)",
-      background: "#fdf0ea", color: "#E8602C", letterSpacing: "0.02em",
+      background: "rgba(232,96,44,0.15)", color: "#f0956a",
+      border: "1px solid rgba(232,96,44,0.25)", letterSpacing: "0.02em",
     }}>{label}</span>
   );
 }
@@ -104,10 +106,10 @@ function ActionBtn({ label, onClick, active, danger }) {
     <button onClick={onClick}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
-        background: hov ? (danger ? "#fff0f0" : "#fdf0ea") : "white",
-        border: "1px solid #dde5f7", borderRadius: "var(--r-full)",
+        background: hov ? (danger ? "rgba(220,38,38,0.15)" : "rgba(232,96,44,0.12)") : "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.1)", borderRadius: "var(--r-full)",
         padding: "6px 14px", fontSize: 12, fontWeight: 600,
-        color: danger ? (hov ? "#dc2626" : "#8fa3cc") : active ? "#E8602C" : "#6680aa",
+        color: danger ? (hov ? "#f87171" : "rgba(255,255,255,0.4)") : active ? "#E8602C" : "rgba(255,255,255,0.55)",
         cursor: "pointer", transition: "all 0.15s",
       }}>{label}</button>
   );
@@ -189,29 +191,29 @@ function ThreadSection({ entry, onUpdate }) {
   }
 
   return (
-    <div style={{ marginTop: 40, borderTop: "1px solid #eef2fb", paddingTop: 28, paddingBottom: 40 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16 }}>
+    <div style={{ marginTop: 40, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 28, paddingBottom: 40 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16 }}>
         Anotações · {threads.length}
       </div>
 
       {/* Thread messages */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
         {threads.length === 0 && (
-          <div style={{ fontSize: 13, color: "#b8c7e8", fontStyle: "italic", padding: "8px 0" }}>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", fontStyle: "italic", padding: "8px 0" }}>
             Nenhuma anotação ainda. Adicione pensamentos, atualizações ou contexto abaixo.
           </div>
         )}
         {threads.map(t => (
           <div key={t.id} style={{
-            background: "#fdf0ea", border: "1px solid #f5c4a8",
+            background: "rgba(232,96,44,0.1)", border: "1px solid rgba(232,96,44,0.2)",
             borderRadius: 14, padding: "12px 16px",
             position: "relative",
           }}>
-            <p style={{ fontSize: 14, color: "#05102a", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, paddingRight: 24 }}>{t.text}</p>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, paddingRight: 24 }}>{t.text}</p>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-              <span style={{ fontSize: 11, color: "#a0b4d4" }}>{formatDateTime(t.createdAt)}</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{formatDateTime(t.createdAt)}</span>
               <button onClick={() => deleteNote(t.id)} style={{
-                background: "none", border: "none", fontSize: 15, color: "#c0cfea",
+                background: "none", border: "none", fontSize: 15, color: "rgba(255,255,255,0.3)",
                 cursor: "pointer", lineHeight: 1, padding: "0 2px",
               }}>×</button>
             </div>
@@ -229,17 +231,17 @@ function ThreadSection({ entry, onUpdate }) {
           rows={2}
           placeholder="Adicionar anotação… (Enter para enviar, Shift+Enter para nova linha)"
           style={{
-            flex: 1, border: "1.5px solid #dde5f7", borderRadius: 12,
+            flex: 1, border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 12,
             padding: "10px 14px", fontSize: 13, resize: "none",
-            outline: "none", fontFamily: "inherit", color: "#05102a",
+            outline: "none", fontFamily: "inherit", color: "rgba(255,255,255,0.85)",
             lineHeight: 1.6, transition: "border-color 0.15s",
-            background: "#faf8f6",
+            background: "rgba(255,255,255,0.05)",
           }}
           onFocus={e => e.target.style.borderColor = "#E8602C"}
-          onBlur={e => e.target.style.borderColor = "#dde5f7"}
+          onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
         />
         <button onClick={addNote} disabled={!text.trim() || saving} style={{
-          background: text.trim() ? "#E8602C" : "#dde5f7",
+          background: text.trim() ? "#E8602C" : "rgba(255,255,255,0.1)",
           border: "none", borderRadius: 10, padding: "10px 16px",
           color: "white", fontSize: 16, fontWeight: 700,
           cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
@@ -281,12 +283,12 @@ function EntryView({ entry, related, onEdit, onPin, onDelete, onUpdate }) {
       {/* Title */}
       <h1 style={{
         fontFamily: "var(--font-serif)", fontSize: 28, fontWeight: 600,
-        color: "#05102a", lineHeight: 1.25, marginBottom: 20, letterSpacing: "-0.01em",
+        color: "rgba(255,255,255,0.92)", lineHeight: 1.25, marginBottom: 20, letterSpacing: "-0.01em",
       }}>{entry.title}</h1>
 
       {/* Content */}
       <p style={{
-        fontSize: 15, lineHeight: 1.85, color: "#3a4a6b",
+        fontSize: 15, lineHeight: 1.85, color: "rgba(255,255,255,0.7)",
         whiteSpace: "pre-wrap", marginBottom: 28,
       }}>{entry.content}</p>
 
@@ -299,14 +301,14 @@ function EntryView({ entry, related, onEdit, onPin, onDelete, onUpdate }) {
 
       {/* Date footer */}
       <div style={{
-        fontSize: 12, color: "#8fa3cc",
-        borderTop: "1px solid #eef2fb", paddingTop: 16, marginBottom: 8,
+        fontSize: 12, color: "rgba(255,255,255,0.3)",
+        borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 16, marginBottom: 8,
       }}>{formatDate(entry.date)}</div>
 
       {/* Related */}
       {related && related.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, marginTop: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, marginTop: 24 }}>
             Relacionadas por tags
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -316,11 +318,11 @@ function EntryView({ entry, related, onEdit, onPin, onDelete, onUpdate }) {
                 <div key={r.id} style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "12px 16px", borderRadius: "var(--r-lg)",
-                  border: "1px solid #eef2fb", background: "#f5f3f0",
+                  border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)",
                 }}>
                   <span style={{ fontSize: 12, color: rm.color }}>{rm.icon}</span>
-                  <span style={{ fontSize: 13, color: "#0a1f4e", flex: 1 }}>{r.title}</span>
-                  <span style={{ fontSize: 11, color: "#8fa3cc" }}>{formatDate(r.date)}</span>
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", flex: 1 }}>{r.title}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{formatDate(r.date)}</span>
                 </div>
               );
             })}
@@ -356,9 +358,9 @@ function EditForm({ entry, onSave, onCancel }) {
   }
 
   const field = {
-    width: "100%", border: "1px solid #dde5f7", borderRadius: "var(--r-md)",
-    padding: "10px 14px", fontSize: 14, color: "#05102a", outline: "none",
-    background: "white", boxSizing: "border-box", fontFamily: "inherit",
+    width: "100%", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "var(--r-md)",
+    padding: "10px 14px", fontSize: 14, color: "rgba(255,255,255,0.88)", outline: "none",
+    background: "rgba(255,255,255,0.06)", boxSizing: "border-box", fontFamily: "inherit",
     transition: "border-color 0.15s",
   };
 
@@ -381,10 +383,10 @@ function EditForm({ entry, onSave, onCancel }) {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {Object.entries(TYPE).map(([key, m]) => (
             <button key={key} onClick={() => setForm(f => ({ ...f, type: key }))} style={{
-              background: form.type === key ? m.bg : "white",
-              border: `1.5px solid ${form.type === key ? m.border : "#dde5f7"}`,
+              background: form.type === key ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+              border: `1.5px solid ${form.type === key ? m.color : "rgba(255,255,255,0.1)"}`,
               borderRadius: "var(--r-full)", padding: "5px 14px",
-              fontSize: 12, fontWeight: 600, color: form.type === key ? m.color : "#8fa3cc",
+              fontSize: 12, fontWeight: 600, color: form.type === key ? m.color : "rgba(255,255,255,0.4)",
               cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
             }}><span>{m.icon}</span>{m.label}</button>
           ))}
@@ -415,7 +417,7 @@ function EditForm({ entry, onSave, onCancel }) {
 }
 
 function FieldLabel({ children }) {
-  return <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>{children}</div>;
+  return <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>{children}</div>;
 }
 
 // ─── Cards View (Masonry) ────────────────────────────────────
@@ -424,7 +426,7 @@ function CardsView({ entries, onOpen }) {
 
   if (entries.length === 0) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#b8c7e8", fontSize: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
         Nenhuma entrada para exibir
       </div>
     );
@@ -432,7 +434,7 @@ function CardsView({ entries, onOpen }) {
 
   return (
     <div style={{ padding: "28px 24px", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#8fa3cc", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 20 }}>
         {entries.length} {entries.length === 1 ? "entrada" : "entradas"}
       </div>
       {/* Masonry via CSS columns */}
@@ -451,13 +453,13 @@ function CardsView({ entries, onOpen }) {
               style={{
                 breakInside: "avoid",
                 marginBottom: 14,
-                background: hov ? "#fdf0ea" : "white",
-                border: `1.5px solid ${hov ? meta.border : "#eef2fb"}`,
+                background: hov ? "#2a2010" : "#232323",
+                border: `1.5px solid ${hov ? "rgba(232,96,44,0.35)" : "rgba(255,255,255,0.08)"}`,
                 borderRadius: 16,
                 padding: "16px 18px",
                 cursor: "pointer",
                 transition: "all 0.15s",
-                boxShadow: hov ? "0 4px 20px rgba(232,96,44,0.1)" : "0 1px 4px rgba(10,31,78,0.05)",
+                boxShadow: hov ? "0 4px 20px rgba(232,96,44,0.15)" : "0 1px 4px rgba(0,0,0,0.3)",
               }}
             >
               {/* Type badge */}
@@ -475,14 +477,14 @@ function CardsView({ entries, onOpen }) {
 
               {/* Title */}
               <h3 style={{
-                fontSize: 14, fontWeight: 600, color: "#05102a",
+                fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.9)",
                 marginBottom: 8, lineHeight: 1.4,
                 fontFamily: "var(--font-serif)",
               }}>{entry.title}</h3>
 
               {/* Content preview */}
               <p style={{
-                fontSize: 12.5, color: "#6680aa", lineHeight: 1.65,
+                fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.65,
                 display: "-webkit-box", WebkitLineClamp: 4,
                 WebkitBoxOrient: "vertical", overflow: "hidden",
                 margin: 0,
@@ -502,9 +504,9 @@ function CardsView({ entries, onOpen }) {
 
               {/* Footer */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-                <span style={{ fontSize: 10.5, color: "#b8c7e8" }}>{relativeDate(entry.date)}</span>
+                <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>{relativeDate(entry.date)}</span>
                 {threadCount > 0 && (
-                  <span style={{ fontSize: 10, color: "#8fa3cc", display: "flex", alignItems: "center", gap: 3 }}>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", display: "flex", alignItems: "center", gap: 3 }}>
                     💬 {threadCount}
                   </span>
                 )}
@@ -554,26 +556,26 @@ function InputBar({ onCreated }) {
   }
 
   return (
-    <div style={{ padding: "12px 24px 20px", background: "white", flexShrink: 0, borderTop: "1px solid #eef2fb" }}>
+    <div style={{ padding: "12px 24px 20px", background: "#1e1e1e", flexShrink: 0, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
       <div style={{ maxWidth: 720, margin: "0 auto", position: "relative" }}>
         {meta && (
           <div style={{
             position: "absolute", top: -32, left: "50%", transform: "translateX(-50%)",
-            background: meta.bg, border: `1px solid ${meta.border}`,
+            background: "rgba(255,255,255,0.08)", border: `1px solid ${meta.color}60`,
             borderRadius: "var(--r-full)", padding: "3px 14px",
             fontSize: 11, fontWeight: 700, color: meta.color,
             display: "flex", alignItems: "center", gap: 5,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)", whiteSpace: "nowrap", pointerEvents: "none",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)", whiteSpace: "nowrap", pointerEvents: "none",
           }}>
             <span>{meta.icon}</span>{meta.label}
           </div>
         )}
         <div style={{
           display: "flex", alignItems: "flex-end", gap: 10,
-          background: focused ? "white" : "#f5f3f0",
-          border: `1.5px solid ${focused ? "#E8602C" : "#dde5f7"}`,
+          background: focused ? "#2a2a2a" : "#232323",
+          border: `1.5px solid ${focused ? "#E8602C" : "rgba(255,255,255,0.1)"}`,
           borderRadius: 16, padding: "12px 14px",
-          boxShadow: focused ? "0 0 0 4px rgba(232,96,44,0.08)" : "0 2px 8px rgba(10,31,78,0.05)",
+          boxShadow: focused ? "0 0 0 4px rgba(232,96,44,0.12)" : "none",
           transition: "all 0.18s",
         }}>
           <textarea
@@ -587,22 +589,22 @@ function InputBar({ onCreated }) {
             placeholder="Nova nota, evento, lembrete… (Alt+Enter para quebrar linha)"
             style={{
               flex: 1, border: "none", outline: "none", resize: "none",
-              background: "transparent", fontSize: 14, color: "#05102a",
+              background: "transparent", fontSize: 14, color: "rgba(255,255,255,0.9)",
               lineHeight: 1.6, maxHeight: 160, overflowY: "auto",
             }}
           />
           <button onClick={submit} disabled={!text.trim() || loading} style={{
             width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-            background: text.trim() ? "#E8602C" : "#dde5f7",
+            background: text.trim() ? "#E8602C" : "rgba(255,255,255,0.1)",
             border: "none", color: "white", fontSize: 15,
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
-            boxShadow: text.trim() ? "0 2px 8px rgba(232,96,44,0.35)" : "none",
+            boxShadow: text.trim() ? "0 2px 8px rgba(232,96,44,0.4)" : "none",
           }}>
             {loading ? <span style={{ fontSize: 11 }}>…</span> : "↑"}
           </button>
         </div>
-        <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#b8c7e8" }}>
+        <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.2)" }}>
           Enter para registrar · Alt+Enter para nova linha
         </div>
       </div>
@@ -632,7 +634,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: "#f5f3f0",
+      background: "#1a1a1a",
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       padding: "24px 24px 40px",
@@ -641,9 +643,9 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
       {/* Close */}
       <button onClick={onClose} style={{
         position: "fixed", top: 20, right: 24,
-        background: "rgba(232,96,44,0.08)", border: "none", borderRadius: "50%",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "50%",
         width: 36, height: 36, fontSize: 20, cursor: "pointer",
-        color: "#E8602C", display: "flex", alignItems: "center", justifyContent: "center",
+        color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", justifyContent: "center",
         lineHeight: 1,
       }}>×</button>
 
@@ -653,23 +655,23 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{
             width: 72, height: 72, borderRadius: 22, margin: "0 auto 20px",
-            background: "linear-gradient(135deg, #E8602C 0%, #1a1a1a 100%)",
+            background: "linear-gradient(135deg, #E8602C 0%, #2a2a2a 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 12px 40px rgba(232,96,44,0.28)",
+            boxShadow: "0 12px 40px rgba(232,96,44,0.3)",
           }}><LogoIcon size={32} /></div>
           <h1 style={{
             fontFamily: "var(--font-serif)", fontSize: 34, fontWeight: 600,
-            color: "#05102a", marginBottom: 8, letterSpacing: "-0.02em", lineHeight: 1.2,
+            color: "rgba(255,255,255,0.92)", marginBottom: 8, letterSpacing: "-0.02em", lineHeight: 1.2,
           }}>{greeting}, Carlos.</h1>
-          <p style={{ fontSize: 16, color: "#8fa3cc", fontWeight: 400 }}>
+          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.4)", fontWeight: 400 }}>
             O que você quer capturar hoje?
           </p>
         </div>
 
         {/* Input Card */}
         <div style={{
-          width: "100%", background: "white", borderRadius: 20,
-          boxShadow: "0 4px 32px rgba(10,31,78,0.08)", border: "1px solid #eef2fb",
+          width: "100%", background: "#232323", borderRadius: 20,
+          boxShadow: "0 4px 32px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.08)",
           overflow: "hidden", marginBottom: 16,
         }}>
           <InputBar onCreated={handleCreated} />
@@ -682,19 +684,20 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
 
         {/* Prefix hints */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 36 }}>
-          {HINTS.map(({ p, c, bg }) => (
+          {HINTS.map(({ p, c }) => (
             <span key={p} style={{
-              fontSize: 11, fontWeight: 600, color: c, background: bg,
-              border: `1px solid ${c}30`, padding: "4px 12px", borderRadius: "var(--r-full)",
+              fontSize: 11, fontWeight: 600, color: c,
+              background: "rgba(255,255,255,0.06)",
+              border: `1px solid rgba(255,255,255,0.1)`, padding: "4px 12px", borderRadius: "var(--r-full)",
             }}>{p}</span>
           ))}
-          <span style={{ fontSize: 11, color: "#b8c7e8", alignSelf: "center" }}>— prefixos de tipo</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", alignSelf: "center" }}>— prefixos de tipo</span>
         </div>
 
         {/* Recent entries */}
         {recentEntries.length > 0 && (
           <div style={{ width: "100%" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#b8c7e8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, textAlign: "center" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12, textAlign: "center" }}>
               Recentes
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -707,17 +710,17 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
                     onClick={() => { onOpenEntry(e); onClose(); }}
                     style={{
                       padding: "12px 16px", borderRadius: 14,
-                      background: "white", border: "1px solid #eef2fb",
+                      background: "#232323", border: "1px solid rgba(255,255,255,0.08)",
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
                       transition: "all 0.12s",
                     }}
-                    onMouseEnter={ev => { ev.currentTarget.style.background = "#fdf0ea"; ev.currentTarget.style.borderColor = "#f5c4a8"; }}
-                    onMouseLeave={ev => { ev.currentTarget.style.background = "white"; ev.currentTarget.style.borderColor = "#eef2fb"; }}
+                    onMouseEnter={ev => { ev.currentTarget.style.background = "#2a2010"; ev.currentTarget.style.borderColor = "rgba(232,96,44,0.3)"; }}
+                    onMouseLeave={ev => { ev.currentTarget.style.background = "#232323"; ev.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
                   >
                     <span style={{ fontSize: isLang ? 16 : 13, color: meta.color, flexShrink: 0 }}>{meta.icon}</span>
-                    <span style={{ flex: 1, fontSize: 14, color: "#05102a", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.title}</span>
-                    {e.threads?.length > 0 && <span style={{ fontSize: 11, color: "#b8c7e8" }}>💬 {e.threads.length}</span>}
-                    <span style={{ fontSize: 11, color: "#b8c7e8", flexShrink: 0 }}>{relativeDate(e.date)}</span>
+                    <span style={{ flex: 1, fontSize: 14, color: "rgba(255,255,255,0.85)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.title}</span>
+                    {e.threads?.length > 0 && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>💬 {e.threads.length}</span>}
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{relativeDate(e.date)}</span>
                   </div>
                 );
               })}
@@ -728,13 +731,13 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
         {/* Workspace link */}
         <button onClick={onClose} style={{
           marginTop: 24, background: "transparent", border: "none",
-          fontSize: 13, color: "#8fa3cc", cursor: "pointer",
+          fontSize: 13, color: "rgba(255,255,255,0.35)", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 4,
           padding: "8px 16px", borderRadius: "var(--r-full)",
           transition: "color 0.15s",
         }}
           onMouseEnter={e => e.currentTarget.style.color = "#E8602C"}
-          onMouseLeave={e => e.currentTarget.style.color = "#8fa3cc"}
+          onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.35)"}
         >
           Abrir workspace →
         </button>
@@ -941,16 +944,17 @@ export default function App() {
 
       {/* ── MAIN AREA ── */}
       {showMain && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "white" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#1e1e1e" }}>
 
           {/* Top bar */}
           <div style={{
-            height: 52, flexShrink: 0, borderBottom: "1px solid #eef2fb",
+            height: 52, flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.08)",
             display: "flex", alignItems: "center", padding: "0 24px", gap: 12,
+            background: "#1e1e1e",
           }}>
             {isMobile && (activeEntry || showCards) && (
               <button onClick={() => { setActiveEntry(null); setEditing(false); setShowCards(false); }} style={{
-                background: "#fdf0ea", border: "none", borderRadius: "var(--r-full)",
+                background: "rgba(232,96,44,0.15)", border: "none", borderRadius: "var(--r-full)",
                 padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#E8602C", cursor: "pointer",
               }}>← Voltar</button>
             )}
@@ -960,31 +964,31 @@ export default function App() {
                 background: "linear-gradient(135deg, #E8602C, #1a1a1a)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}><LogoIcon size={11} /></div>
-              <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 600, color: "#05102a", letterSpacing: "-0.01em" }}>
-                Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "#8fa3cc", letterSpacing: "0.1em", textTransform: "uppercase" }}>workspace</span>
+              <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", letterSpacing: "-0.01em" }}>
+                Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>workspace</span>
               </span>
             </div>
 
             {/* Home button */}
             <button onClick={() => setShowHome(true)} style={{
-              background: "transparent", border: "1px solid #dde5f7",
+              background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: "var(--r-full)", padding: "5px 12px",
-              fontSize: 13, color: "#8fa3cc", cursor: "pointer",
+              fontSize: 13, color: "rgba(255,255,255,0.4)", cursor: "pointer",
               transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5,
             }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#fdf0ea"; e.currentTarget.style.color = "#E8602C"; e.currentTarget.style.borderColor = "#f5c4a8"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8fa3cc"; e.currentTarget.style.borderColor = "#dde5f7"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(232,96,44,0.15)"; e.currentTarget.style.color = "#E8602C"; e.currentTarget.style.borderColor = "rgba(232,96,44,0.4)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
             >⌂ Home</button>
 
             {/* Cards toggle button */}
             <button
               onClick={() => { setShowCards(v => !v); if (!showCards) setActiveEntry(null); }}
               style={{
-                background: showCards ? "#fdf0ea" : "transparent",
-                border: `1px solid ${showCards ? "#f5c4a8" : "#dde5f7"}`,
+                background: showCards ? "rgba(232,96,44,0.2)" : "transparent",
+                border: `1px solid ${showCards ? "rgba(232,96,44,0.4)" : "rgba(255,255,255,0.1)"}`,
                 borderRadius: "var(--r-full)", padding: "6px 14px",
                 fontSize: 12, fontWeight: 600,
-                color: showCards ? "#E8602C" : "#6680aa",
+                color: showCards ? "#E8602C" : "rgba(255,255,255,0.5)",
                 cursor: "pointer", transition: "all 0.15s",
                 display: "flex", alignItems: "center", gap: 5,
               }}
@@ -995,7 +999,7 @@ export default function App() {
             {activeEntry && !showCards && (
               <>
                 {!isMobile && (
-                  <span style={{ fontSize: 12, color: "#b8c7e8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {activeEntry.title.slice(0, 40)}{activeEntry.title.length > 40 ? "…" : ""}
                   </span>
                 )}
@@ -1006,10 +1010,10 @@ export default function App() {
                   const canNext = idx >= 0 && idx < entries.length - 1;
                   const navBtn = (label, onClick, enabled) => (
                     <button onClick={onClick} disabled={!enabled} style={{
-                      background: "transparent", border: "1px solid #dde5f7",
+                      background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: "var(--r-full)", padding: "5px 12px",
                       fontSize: 13, fontWeight: 600,
-                      color: enabled ? "#6680aa" : "#d0d8e8",
+                      color: enabled ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)",
                       cursor: enabled ? "pointer" : "default", transition: "all 0.15s",
                     }}>{label}</button>
                   );
@@ -1045,15 +1049,15 @@ export default function App() {
                   boxShadow: "0 8px 32px rgba(232,96,44,0.2)",
                 }}><LogoIcon size={28} /></div>
                 <div style={{ textAlign: "center" }}>
-                  <p style={{ fontSize: 18, fontWeight: 600, color: "#05102a", fontFamily: "var(--font-serif)", marginBottom: 6 }}>Fields' Workspace</p>
-                  <p style={{ fontSize: 14, color: "#8fa3cc" }}>Selecione uma entrada ou crie uma nova abaixo</p>
+                  <p style={{ fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.75)", fontFamily: "var(--font-serif)", marginBottom: 6 }}>Fields' Workspace</p>
+                  <p style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>Selecione uma entrada ou crie uma nova abaixo</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
                   {[
-                    { p: "evento …",   c: "#0d52c4" }, { p: "lembrete …", c: "#0a3d99" },
-                    { p: "frances …",  c: "#0055A4" }, { p: "jp …",       c: "#BC002D" },
+                    { p: "evento …",   c: "#9a9aaa" }, { p: "lembrete …", c: "#c4a97a" },
+                    { p: "frances …",  c: "#6699cc" }, { p: "jp …",       c: "#cc6677" },
                   ].map(({ p, c }) => (
-                    <span key={p} style={{ fontSize: 12, fontWeight: 600, color: c, background: `${c}10`, border: `1px solid ${c}25`, padding: "4px 12px", borderRadius: "var(--r-full)" }}>{p}</span>
+                    <span key={p} style={{ fontSize: 12, fontWeight: 600, color: c, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "4px 12px", borderRadius: "var(--r-full)" }}>{p}</span>
                   ))}
                 </div>
               </div>
