@@ -3,9 +3,9 @@ import { api } from "./api.js";
 
 // ─── Constants ──────────────────────────────────────────────
 const TYPE = {
-  note:     { label: "Nota",      icon: "✦",  color: "#2970ff", bg: "#e8f0ff", border: "#c4d9ff" },
-  event:    { label: "Evento",    icon: "◈",  color: "#0d52c4", bg: "#dce8ff", border: "#93bbff" },
-  reminder: { label: "Lembrete", icon: "◉",  color: "#0a3d99", bg: "#d0dfff", border: "#7aaaff" },
+  note:     { label: "Nota",      icon: "✦",  color: "#E8602C", bg: "#fdf0ea", border: "#f5c4a8" },
+  event:    { label: "Evento",    icon: "◈",  color: "#5a5a6a", bg: "#f0f0f4", border: "#d0d0dc" },
+  reminder: { label: "Lembrete", icon: "◉",  color: "#7a5c3a", bg: "#faf3ea", border: "#e8d4b8" },
   lang_fr:  { label: "Francês",  icon: "🇫🇷", color: "#0055A4", bg: "#e8eeff", border: "#90aee8" },
   lang_jp:  { label: "Japonês",  icon: "🇯🇵", color: "#BC002D", bg: "#ffecec", border: "#f5a0a0" },
 };
@@ -55,19 +55,17 @@ function formatDateTime(iso) {
 }
 
 // ─── Logo ────────────────────────────────────────────────────
-// Meteoro: cabeça circular com F dentro + rastro diagonal
+// F' — o F em traço limpo, o apóstrofo é um pequeno meteoro
 function LogoIcon({ size = 16, color = "white" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      {/* Rastro do meteoro — 3 riscos diagonais à esquerda */}
-      <line x1="1"  y1="8"  x2="10" y2="16" stroke={color} strokeWidth="2"   strokeLinecap="round" opacity="0.55"/>
-      <line x1="2"  y1="4"  x2="9"  y2="12" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.32"/>
-      <line x1="0"  y1="14" x2="8"  y2="21" stroke={color} strokeWidth="1"   strokeLinecap="round" opacity="0.2"/>
-      {/* Cabeça do meteoro */}
-      <circle cx="20" cy="18" r="10.5" stroke={color} strokeWidth="1.8"/>
-      {/* F estilizado dentro do círculo */}
-      <path d="M16 24 L16 12 M16 12 L24 12 M16 18 L22 18"
-            stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* F bold */}
+      <path d="M7 27 L7 6 L22 6 M7 17 L18 17"
+            stroke={color} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Meteoro apostrofo — cabeça + rastro diagonal */}
+      <circle cx="26" cy="4" r="2.4" fill={color}/>
+      <line x1="24.2" y1="6"   x2="20" y2="10.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" opacity="0.65"/>
+      <line x1="22.8" y1="6.8" x2="18.5" y2="12" stroke={color} strokeWidth="1"   strokeLinecap="round" opacity="0.35"/>
     </svg>
   );
 }
@@ -205,7 +203,7 @@ function ThreadSection({ entry, onUpdate }) {
         )}
         {threads.map(t => (
           <div key={t.id} style={{
-            background: "#f4f7ff", border: "1px solid #e4ecff",
+            background: "#fdf0ea", border: "1px solid #f5c4a8",
             borderRadius: 14, padding: "12px 16px",
             position: "relative",
           }}>
@@ -235,7 +233,7 @@ function ThreadSection({ entry, onUpdate }) {
             padding: "10px 14px", fontSize: 13, resize: "none",
             outline: "none", fontFamily: "inherit", color: "#05102a",
             lineHeight: 1.6, transition: "border-color 0.15s",
-            background: "#fafcff",
+            background: "#faf8f6",
           }}
           onFocus={e => e.target.style.borderColor = "#E8602C"}
           onBlur={e => e.target.style.borderColor = "#dde5f7"}
@@ -318,7 +316,7 @@ function EntryView({ entry, related, onEdit, onPin, onDelete, onUpdate }) {
                 <div key={r.id} style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "12px 16px", borderRadius: "var(--r-lg)",
-                  border: "1px solid #eef2fb", background: "#f8faff",
+                  border: "1px solid #eef2fb", background: "#f5f3f0",
                 }}>
                   <span style={{ fontSize: 12, color: rm.color }}>{rm.icon}</span>
                   <span style={{ fontSize: 13, color: "#0a1f4e", flex: 1 }}>{r.title}</span>
@@ -453,7 +451,7 @@ function CardsView({ entries, onOpen }) {
               style={{
                 breakInside: "avoid",
                 marginBottom: 14,
-                background: hov ? "#f4f8ff" : "white",
+                background: hov ? "#fdf0ea" : "white",
                 border: `1.5px solid ${hov ? meta.border : "#eef2fb"}`,
                 borderRadius: 16,
                 padding: "16px 18px",
@@ -572,7 +570,7 @@ function InputBar({ onCreated }) {
         )}
         <div style={{
           display: "flex", alignItems: "flex-end", gap: 10,
-          background: focused ? "white" : "#f8faff",
+          background: focused ? "white" : "#f5f3f0",
           border: `1.5px solid ${focused ? "#E8602C" : "#dde5f7"}`,
           borderRadius: 16, padding: "12px 14px",
           boxShadow: focused ? "0 0 0 4px rgba(232,96,44,0.08)" : "0 2px 8px rgba(10,31,78,0.05)",
@@ -625,8 +623,8 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
   }
 
   const HINTS = [
-    { p: "evento …",   c: "#0d52c4", bg: "#dce8ff" },
-    { p: "lembrete …", c: "#0a3d99", bg: "#d0dfff" },
+    { p: "evento …",   c: "#5a5a6a", bg: "#f0f0f4" },
+    { p: "lembrete …", c: "#7a5c3a", bg: "#faf3ea" },
     { p: "frances …",  c: "#0055A4", bg: "#e8eeff" },
     { p: "jp …",       c: "#BC002D", bg: "#ffecec" },
   ];
@@ -634,7 +632,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: "#f5f7fc",
+      background: "#f5f3f0",
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       padding: "24px 24px 40px",
@@ -835,7 +833,7 @@ export default function App() {
   const showMain    = !isMobile || !!activeEntry || showCards;
 
   return (
-    <div style={{ height: "100vh", display: "flex", overflow: "hidden", background: "#f8faff" }}>
+    <div style={{ height: "100vh", display: "flex", overflow: "hidden", background: "#f5f3f0" }}>
       {showHome && (
         <HomePage
           onClose={() => setShowHome(false)}
@@ -966,6 +964,17 @@ export default function App() {
                 Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "#8fa3cc", letterSpacing: "0.1em", textTransform: "uppercase" }}>workspace</span>
               </span>
             </div>
+
+            {/* Home button */}
+            <button onClick={() => setShowHome(true)} style={{
+              background: "transparent", border: "1px solid #dde5f7",
+              borderRadius: "var(--r-full)", padding: "5px 12px",
+              fontSize: 13, color: "#8fa3cc", cursor: "pointer",
+              transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5,
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#fdf0ea"; e.currentTarget.style.color = "#E8602C"; e.currentTarget.style.borderColor = "#f5c4a8"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8fa3cc"; e.currentTarget.style.borderColor = "#dde5f7"; }}
+            >⌂ Home</button>
 
             {/* Cards toggle button */}
             <button
