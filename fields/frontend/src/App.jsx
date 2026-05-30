@@ -55,35 +55,57 @@ function formatDateTime(iso) {
 }
 
 // ─── Logo ────────────────────────────────────────────────────
+// O F É o dino: cabeça no canto superior, boca aberta entre os dois braços,
+// corpo descendo. Traço arredondado, olhinho dentro da cabeça.
 function LogoIcon({ size = 16, color = "white" }) {
   return (
-    <svg width={Math.round(size * 1.1)} height={size} viewBox="0 0 38 34" fill="none">
+    <svg width={Math.round(size * 0.85)} height={size} viewBox="0 0 26 32" fill="none">
       {/*
-        Boca de dino: perfil olhando pra direita.
-        O F nasce da bocarra aberta.
-        Tudo arredondado, traço leve.
+        Silhueta do F traçada como contorno único.
+        Lendo como dino de perfil (olhando pra direita):
+          - nuca/costas = lado esquerdo vertical
+          - cabeça = canto superior, transicionando pro maxilar superior
+          - maxilar superior = braço de cima do F
+          - boca aberta = espaço entre os dois braços
+          - maxilar inferior = braço do meio do F
+          - corpo/cauda = parte de baixo do traço vertical
       */}
-
-      {/* Mandíbula superior — curva da nuca até a ponta do focinho */}
       <path
-        d="M5 32 L5 14 Q5 4 14 4 L25 4 Q32 4 32 11 L32 15 Q32 19 27 19 L9 19"
-        stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+        d="
+          M 5.5 2
+          L 19 2
+          Q 24 2 24 7
+          L 24 9.5
+          Q 24 13 19 13
+          L 9.5 13
+          Q 8.5 13 8.5 14
+          L 8.5 17
+          Q 8.5 18 9.5 18
+          L 16.5 18
+          Q 21 18 21 22
+          L 21 24.5
+          Q 21 28 16.5 28
+          L 9.5 28
+          Q 8.5 28 8.5 29
+          L 8.5 30.5
+          Q 8.5 32 7 32
+          L 4.5 32
+          Q 3 32 3 30.5
+          L 3 4
+          Q 3 2 5.5 2
+          Z
+        "
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        fill="none"
       />
-
-      {/* Mandíbula inferior */}
-      <path
-        d="M5 24 L19 24 Q25 24 25 28 Q25 32 20 32 L5 32"
-        stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
-      />
-
-      {/* Dentinhos redondos na mandíbula superior */}
-      <circle cx="14.5" cy="4"   r="1.6" fill={color} opacity="0.9"/>
-      <circle cx="19.5" cy="3.2" r="1.6" fill={color} opacity="0.9"/>
-      <circle cx="24.5" cy="4"   r="1.6" fill={color} opacity="0.9"/>
-
-      {/* Olhinho */}
-      <circle cx="29" cy="9" r="2.4" fill={color} opacity="0.85"/>
-      <circle cx="29" cy="9" r="1"   fill={color} opacity="0.3"/>
+      {/* Olhinho — dentro da cabeça, no braço superior */}
+      <ellipse cx="19" cy="6.5" rx="2" ry="2.2"
+        stroke={color} strokeWidth="1.4" opacity="0.9"/>
+      <circle cx="19.4" cy="7" r="0.75"
+        fill={color} opacity="0.6"/>
     </svg>
   );
 }
@@ -94,7 +116,7 @@ function Toast({ msg, onDone }) {
   return (
     <div style={{
       position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
-      zIndex: 9999, background: "#1c2033", color: "white",
+      zIndex: 9999, background: "#1a1a1a", color: "white",
       padding: "10px 20px", borderRadius: "var(--r-full)",
       fontSize: 13, fontWeight: 500, boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
       whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8,
@@ -671,7 +693,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{
             width: 72, height: 72, borderRadius: 22, margin: "0 auto 20px",
-            background: "linear-gradient(135deg, #2970ff 0%, #091f5c 100%)",
+            background: "linear-gradient(135deg, #E8602C 0%, #1a1a1a 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 12px 40px rgba(41,112,255,0.28)",
           }}><LogoIcon size={32} /></div>
@@ -865,7 +887,7 @@ export default function App() {
       {showSidebar && (
         <div style={{
           width: isMobile ? "100%" : 260, flexShrink: 0,
-          background: "#1c2033",
+          background: "#1a1a1a",
           display: "flex", flexDirection: "column",
           overflow: "hidden",
         }}>
@@ -873,7 +895,7 @@ export default function App() {
           <div style={{ padding: "18px 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
               width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-              background: "rgba(255,255,255,0.1)",
+              background: "#E8602C",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}><LogoIcon size={14} /></div>
             <span style={{ fontFamily: "var(--font-serif)", fontSize: 17, fontWeight: 600, color: "white", letterSpacing: "-0.01em" }}>Fields'</span>
@@ -975,7 +997,7 @@ export default function App() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
               <div style={{
                 width: 24, height: 24, borderRadius: 6,
-                background: "linear-gradient(135deg, #2970ff, #091f5c)",
+                background: "linear-gradient(135deg, #E8602C, #1a1a1a)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}><LogoIcon size={11} /></div>
               <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 600, color: "#05102a", letterSpacing: "-0.01em" }}>
@@ -1022,7 +1044,7 @@ export default function App() {
               }}>
                 <div style={{
                   width: 64, height: 64, borderRadius: 18,
-                  background: "linear-gradient(135deg, #2970ff, #091f5c)",
+                  background: "linear-gradient(135deg, #E8602C, #1a1a1a)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   boxShadow: "0 8px 32px rgba(41,112,255,0.2)",
                 }}><LogoIcon size={28} /></div>
