@@ -57,10 +57,16 @@ function formatDateTime(iso) {
 // ─── Logo ────────────────────────────────────────────────────
 function LogoIcon({ size = 16, color = "white" }) {
   return (
-    <svg width={size} height={Math.round(size * 0.8)} viewBox="0 0 20 16" fill="none">
-      <line x1="1" y1="1.5"  x2="19" y2="1.5"  stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="1" y1="8"    x2="12" y2="8"    stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="1" y1="14.5" x2="7"  y2="14.5" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+    <svg width={size} height={Math.round(size * 1.15)} viewBox="0 0 30 34" fill="none">
+      {/* Vertical stroke */}
+      <path d="M7 31 L7 3" stroke={color} strokeWidth="3.5" strokeLinecap="round"/>
+      {/* Top horizontal bar */}
+      <path d="M7 3 L23 3" stroke={color} strokeWidth="3.5" strokeLinecap="round"/>
+      {/* Middle bar — gentle upward arc, like a horizon / open field */}
+      <path d="M7 16 Q15 12.5 22 16" stroke={color} strokeWidth="3" strokeLinecap="round" fill="none"/>
+      {/* Two floating dots — stars / sparks of imagination */}
+      <circle cx="26.5" cy="2.5" r="2" fill={color} opacity="0.65"/>
+      <circle cx="25"   cy="7.5" r="1.2" fill={color} opacity="0.38"/>
     </svg>
   );
 }
