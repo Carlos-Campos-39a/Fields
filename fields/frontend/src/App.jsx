@@ -55,17 +55,15 @@ function formatDateTime(iso) {
 }
 
 // ─── Logo ────────────────────────────────────────────────────
-// F' — o F em traço limpo, o apóstrofo é um pequeno meteoro
+// F' — monograma sólido e geométrico, apóstrofo como acento anguloso (estilo executivo/corporativo)
 function LogoIcon({ size = 16, color = "white" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      {/* F bold */}
-      <path d="M7 27 L7 6 L22 6 M7 17 L18 17"
-            stroke={color} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* Meteoro apostrofo — cabeça + rastro diagonal */}
-      <circle cx="26" cy="4" r="2.4" fill={color}/>
-      <line x1="24.2" y1="6"   x2="20" y2="10.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" opacity="0.65"/>
-      <line x1="22.8" y1="6.8" x2="18.5" y2="12" stroke={color} strokeWidth="1"   strokeLinecap="round" opacity="0.35"/>
+      {/* F — bloco sólido, proporções equilibradas */}
+      <path d="M8 5 L24.5 5 L24.5 9.5 L13 9.5 L13 14 L20.5 14 L20.5 18.5 L13 18.5 L13 27 L8 27 Z"
+            fill={color}/>
+      {/* Apóstrofo — acento anguloso, sólido */}
+      <path d="M26.5 4 L29.5 4 L27.3 11.5 L25.3 11.5 Z" fill={color}/>
     </svg>
   );
 }
