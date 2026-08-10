@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import ReactDOM from "react-dom";
 import { api } from "./api.js";
 
 // ─── Constants ──────────────────────────────────────────────
@@ -622,45 +623,67 @@ const PROJ_STATUS_COLOR = {
 };
 
 function StatusBadge({ value, onChange, small }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef();
+  const [open, setOpen]   = useState(false);
+  const [pos, setPos]     = useState({ top: 0, left: 0 });
+  const triggerRef        = useRef();
+  const dropRef           = useRef();
   const color = PROJ_STATUS_COLOR[value] || "rgba(255,255,255,0.3)";
+  const isGray = color.startsWith("rgba(255,255,255");
+
+  function handleToggle(e) {
+    e.stopPropagation();
+    if (open) { setOpen(false); return; }
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.left });
+    setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return;
-    function handler(e) { if (!ref.current?.contains(e.target)) setOpen(false); }
+    function handler(e) {
+      if (triggerRef.current?.contains(e.target)) return;
+      if (dropRef.current?.contains(e.target)) return;
+      setOpen(false);
+    }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <span onClick={e => { e.stopPropagation(); setOpen(v => !v); }} style={{
+    <div ref={triggerRef} style={{ display: "inline-block" }}>
+      <span onClick={handleToggle} style={{
         display: "inline-block", fontSize: small ? 10 : 11, fontWeight: 700,
         padding: small ? "2px 7px" : "3px 10px", borderRadius: "var(--r-full)",
-        background: color === "rgba(255,255,255,0.22)" || color === "rgba(255,255,255,0.4)"
-          ? "rgba(255,255,255,0.06)" : `${color}18`,
-        color, border: `1px solid ${color === "rgba(255,255,255,0.22)" || color === "rgba(255,255,255,0.4)"
-          ? "rgba(255,255,255,0.1)" : `${color}40`}`,
+        background: isGray ? "rgba(255,255,255,0.06)" : `${color}18`,
+        color, border: `1px solid ${isGray ? "rgba(255,255,255,0.1)" : `${color}40`}`,
         cursor: "pointer", whiteSpace: "nowrap", letterSpacing: "0.01em",
       }}>{value || "—"}</span>
-      {open && (
-        <div style={{
-          position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200,
-          background: "#2a2a2a", border: "1px solid rgba(255,255,255,0.12)",
-          borderRadius: 10, padding: "4px 0", minWidth: 148,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+
+      {open && ReactDOM.createPortal(
+        <div ref={dropRef} style={{
+          position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
+          background: "#242424", border: "1px solid rgba(255,255,255,0.14)",
+          borderRadius: 12, padding: "6px 0", minWidth: 160,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.7)",
         }}>
-          {PROJ_STATUS_LIST.map(s => (
-            <div key={s} onClick={e => { e.stopPropagation(); onChange(s); setOpen(false); }} style={{
-              padding: "7px 14px", fontSize: 12, cursor: "pointer",
-              color: PROJ_STATUS_COLOR[s], transition: "background 0.1s",
-            }}
-              onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.06)"}
-              onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
-            >{s}</div>
-          ))}
-        </div>
+          {PROJ_STATUS_LIST.map(s => {
+            const sc = PROJ_STATUS_COLOR[s];
+            const sg = sc.startsWith("rgba(255,255,255");
+            return (
+              <div key={s} onClick={e => { e.stopPropagation(); onChange(s); setOpen(false); }} style={{
+                padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 8, transition: "background 0.1s",
+              }}
+                onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+                onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: sg ? "rgba(255,255,255,0.2)" : sc }} />
+                <span style={{ color: sc }}>{s}</span>
+              </div>
+            );
+          })}
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -725,6 +748,7 @@ function ProjectsView() {
   const [loading, setLoading]     = useState(true);
   const [adding, setAdding]       = useState(null); // { type, parentId }
   const [addVal, setAddVal]       = useState("");
+  const [showLog, setShowLog]     = useState(false); // false = só pendentes, true = tudo
   const addRef = useRef();
 
   useEffect(() => { load(); }, []);
@@ -800,11 +824,23 @@ function ProjectsView() {
             Status, prazo e responsável por frente de trabalho
           </p>
         </div>
-        <button onClick={() => { setAdding({ type: "project" }); setAddVal(""); }} style={{
-          background: "#E8602C", border: "none", borderRadius: "var(--r-full)",
-          padding: "8px 18px", fontSize: 12, fontWeight: 700, color: "white", cursor: "pointer",
-          boxShadow: "0 2px 12px rgba(232,96,44,0.35)", flexShrink: 0,
-        }}>+ Novo projeto</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={() => setShowLog(v => !v)} style={{
+            background: showLog ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)",
+            border: `1px solid ${showLog ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.1)"}`,
+            borderRadius: "var(--r-full)", padding: "8px 18px",
+            fontSize: 12, fontWeight: 700,
+            color: showLog ? "#10b981" : "rgba(255,255,255,0.4)",
+            cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span style={{ fontSize: 11 }}>{showLog ? "●" : "○"}</span> Log
+          </button>
+          <button onClick={() => { setAdding({ type: "project" }); setAddVal(""); }} style={{
+            background: "#E8602C", border: "none", borderRadius: "var(--r-full)",
+            padding: "8px 18px", fontSize: 12, fontWeight: 700, color: "white", cursor: "pointer",
+            boxShadow: "0 2px 12px rgba(232,96,44,0.35)", flexShrink: 0,
+          }}>+ Novo projeto</button>
+        </div>
       </div>
 
       {/* Table */}
@@ -882,15 +918,17 @@ function ProjectsView() {
                       </tr>
 
                       {/* Task rows */}
-                      {frente.tasks.map(task => (
-                        <tr key={task.id} style={{ background: "rgba(0,0,0,0.2)" }}
+                      {(showLog ? frente.tasks : frente.tasks.filter(t => t.status !== "Concluído")).map(task => {
+                        const isDone = task.status === "Concluído";
+                        return (
+                        <tr key={task.id} style={{ background: isDone ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.2)", opacity: isDone ? 0.55 : 1 }}
                           onMouseEnter={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.015)"; ev.currentTarget.querySelector(".del-task").style.opacity = "1"; }}
-                          onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(0,0,0,0.2)"; ev.currentTarget.querySelector(".del-task").style.opacity = "0"; }}
+                          onMouseLeave={ev => { ev.currentTarget.style.background = isDone ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.2)"; ev.currentTarget.querySelector(".del-task").style.opacity = "0"; }}
                         >
                           <td style={{ padding: "6px 12px 6px 48px", ...tdBorder }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.15)", flexShrink: 0 }}>◦</span>
-                              <div style={{ flex: 1 }}>
+                              <span style={{ fontSize: 8, color: isDone ? "#10b981" : "rgba(255,255,255,0.15)", flexShrink: 0 }}>{isDone ? "✓" : "◦"}</span>
+                              <div style={{ flex: 1, textDecoration: isDone ? "line-through" : "none" }}>
                                 <EditableCell value={task.name} onSave={v => saveTask(proj.id, frente.id, task.id, { name: v })} placeholder="Tarefa" />
                               </div>
                               <button className="del-task" onClick={() => delTask(proj.id, frente.id, task.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,100,100,0.5)", fontSize: 10, opacity: 0, transition: "opacity 0.15s", padding: "2px 4px", flexShrink: 0 }}>✕</button>
@@ -912,7 +950,8 @@ function ProjectsView() {
                             <HolderToggle value={task.holder} onChange={v => saveTask(proj.id, frente.id, task.id, { holder: v })} />
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
 
                       {/* Inline: add task */}
                       {adding?.type === "task" && adding?.parentId === frente.id && (
