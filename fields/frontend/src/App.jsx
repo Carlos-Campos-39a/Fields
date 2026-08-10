@@ -156,12 +156,50 @@ function SidebarItem({ entry, active, onClick }) {
 
 // ─── Thread Section ──────────────────────────────────────────
 function ThreadSection({ entry, onUpdate }) {
-  const [threads, setThreads] = useState(entry.threads || []);
-  const [text, setText] = useState("");
-  const [saving, setSaving] = useState(false);
-  const textRef = useRef();
+  const [threads, setThreads]           = useState(entry.threads || []);
+  const [text, setText]                 = useState("");
+  const [saving, setSaving]             = useState(false);
+  const [linkedTask, setLinkedTask]     = useState(null); // { taskId, taskName, frenteName, projName, frenteId, projId, currentComments }
+  const [showPicker, setShowPicker]     = useState(false);
+  const [pickerPos, setPickerPos]       = useState({ top: 0, left: 0 });
+  const [pickerProjs, setPickerProjs]   = useState(null); // null = não carregado
+  const [pickerLoad, setPickerLoad]     = useState(false);
+  const textRef      = useRef();
+  const pickerBtnRef = useRef();
+  const pickerPanRef = useRef();
 
   useEffect(() => { setThreads(entry.threads || []); }, [entry.id]);
+  useEffect(() => { setLinkedTask(null); }, [entry.id]);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    function handler(e) {
+      if (pickerBtnRef.current?.contains(e.target)) return;
+      if (pickerPanRef.current?.contains(e.target)) return;
+      setShowPicker(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showPicker]);
+
+  async function openPicker(e) {
+    e.stopPropagation();
+    if (showPicker) { setShowPicker(false); return; }
+    const rect = pickerBtnRef.current.getBoundingClientRect();
+    setPickerPos({ top: rect.top, left: rect.left });
+    setShowPicker(true);
+    if (!pickerProjs) {
+      setPickerLoad(true);
+      try { const { projects } = await api.getProjects(); setPickerProjs(projects); }
+      catch { setPickerProjs([]); }
+      finally { setPickerLoad(false); }
+    }
+  }
+
+  function selectTask(proj, frente, task) {
+    setLinkedTask({ taskId: task.id, taskName: task.name, frenteName: frente.name, projName: proj.name, frenteId: frente.id, projId: proj.id, currentComments: task.comments || [] });
+    setShowPicker(false);
+  }
 
   async function addNote() {
     if (!text.trim() || saving) return;
@@ -173,6 +211,12 @@ function ThreadSection({ entry, onUpdate }) {
     try {
       const { entry: e } = await api.updateEntry(entry.id, { threads: updated });
       onUpdate(e);
+      if (linkedTask) {
+        const taskCmt = { id: crypto.randomUUID(), text: note.text, created_at: new Date().toISOString() };
+        const nextCmts = [...linkedTask.currentComments, taskCmt];
+        await api.updateTask(linkedTask.taskId, { comments: nextCmts });
+        setLinkedTask(prev => prev ? { ...prev, currentComments: nextCmts } : null);
+      }
     } finally { setSaving(false); }
   }
 
@@ -205,20 +249,35 @@ function ThreadSection({ entry, onUpdate }) {
         {threads.map(t => (
           <div key={t.id} style={{
             background: "rgba(232,96,44,0.1)", border: "1px solid rgba(232,96,44,0.2)",
-            borderRadius: 14, padding: "12px 16px",
-            position: "relative",
+            borderRadius: 14, padding: "12px 16px", position: "relative",
           }}>
             <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, paddingRight: 24 }}>{t.text}</p>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{formatDateTime(t.createdAt)}</span>
-              <button onClick={() => deleteNote(t.id)} style={{
-                background: "none", border: "none", fontSize: 15, color: "rgba(255,255,255,0.3)",
-                cursor: "pointer", lineHeight: 1, padding: "0 2px",
-              }}>×</button>
+              <button onClick={() => deleteNote(t.id)} style={{ background: "none", border: "none", fontSize: 15, color: "rgba(255,255,255,0.3)", cursor: "pointer", lineHeight: 1, padding: "0 2px" }}>×</button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Linked task chip */}
+      {linkedTask && (
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>→</span>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            background: "rgba(232,96,44,0.1)", border: "1px solid rgba(232,96,44,0.28)",
+            borderRadius: 20, padding: "3px 10px 3px 12px",
+          }}>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{linkedTask.projName}</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>›</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{linkedTask.frenteName}</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>›</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#f0956a" }}>{linkedTask.taskName}</span>
+            <button onClick={() => setLinkedTask(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.28)", fontSize: 13, padding: "0 0 0 3px", lineHeight: 1 }}>×</button>
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
@@ -239,14 +298,82 @@ function ThreadSection({ entry, onUpdate }) {
           onFocus={e => e.target.style.borderColor = "#E8602C"}
           onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
         />
-        <button onClick={addNote} disabled={!text.trim() || saving} style={{
-          background: text.trim() ? "#E8602C" : "rgba(255,255,255,0.1)",
-          border: "none", borderRadius: 10, padding: "10px 16px",
-          color: "white", fontSize: 16, fontWeight: 700,
-          cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
-          flexShrink: 0,
-        }}>↑</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          {/* Link-to-task button */}
+          <button ref={pickerBtnRef} onClick={openPicker} title="Vincular a uma task" style={{
+            background: linkedTask ? "rgba(232,96,44,0.18)" : "rgba(255,255,255,0.07)",
+            border: `1px solid ${linkedTask ? "rgba(232,96,44,0.4)" : "rgba(255,255,255,0.12)"}`,
+            borderRadius: 10, padding: "8px 12px", color: linkedTask ? "#E8602C" : "rgba(255,255,255,0.4)",
+            cursor: "pointer", fontSize: 13, transition: "all 0.15s", lineHeight: 1,
+          }}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style={{ display: "block" }}>
+              <path d="M2 1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5.5L2 15V2a1 1 0 0 1 1-1z"/>
+            </svg>
+          </button>
+          {/* Send button */}
+          <button onClick={addNote} disabled={!text.trim() || saving} style={{
+            background: text.trim() ? "#E8602C" : "rgba(255,255,255,0.1)",
+            border: "none", borderRadius: 10, padding: "8px 16px",
+            color: "white", fontSize: 16, fontWeight: 700,
+            cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
+          }}>↑</button>
+        </div>
       </div>
+
+      {/* Task picker portal */}
+      {showPicker && ReactDOM.createPortal(
+        <div ref={pickerPanRef} style={{
+          position: "fixed", top: pickerPos.top, left: pickerPos.left,
+          transform: "translateY(-100%) translateY(-8px)",
+          zIndex: 9999, width: 310, maxHeight: 360, overflowY: "auto",
+          background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.13)",
+          borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.75)",
+        }}>
+          <div style={{ padding: "11px 14px 9px", borderBottom: "1px solid rgba(255,255,255,0.07)", position: "sticky", top: 0, background: "#1e1e1e" }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Vincular a task</span>
+          </div>
+          {pickerLoad ? (
+            <div style={{ padding: "20px 14px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>Carregando…</div>
+          ) : !pickerProjs || pickerProjs.length === 0 ? (
+            <div style={{ padding: "16px 14px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>Nenhum projeto encontrado.</div>
+          ) : pickerProjs.map(proj => (
+            <div key={proj.id}>
+              {/* Project header */}
+              <div style={{ padding: "9px 14px 4px", fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.55)", letterSpacing: "0.03em", background: "rgba(255,255,255,0.02)" }}>
+                {proj.name}
+              </div>
+              {proj.frentes?.map(frente => (
+                <div key={frente.id}>
+                  {/* Frente header */}
+                  <div style={{ padding: "4px 14px 2px 22px", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>
+                    ▸ {frente.name}
+                  </div>
+                  {frente.tasks?.filter(t => t.status !== "Concluído").map(task => {
+                    const isSelected = linkedTask?.taskId === task.id;
+                    return (
+                      <div key={task.id} onClick={() => selectTask(proj, frente, task)} style={{
+                        padding: "7px 14px 7px 32px", fontSize: 12, cursor: "pointer",
+                        color: isSelected ? "#f0956a" : "rgba(255,255,255,0.7)",
+                        background: isSelected ? "rgba(232,96,44,0.1)" : "transparent",
+                        transition: "background 0.1s",
+                        display: "flex", alignItems: "center", gap: 6,
+                      }}
+                        onMouseEnter={ev => { if (!isSelected) ev.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                        onMouseLeave={ev => { if (!isSelected) ev.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span style={{ fontSize: 8, color: isSelected ? "#E8602C" : "rgba(255,255,255,0.2)", flexShrink: 0 }}>{isSelected ? "●" : "◦"}</span>
+                        <span style={{ flex: 1 }}>{task.name || "—"}</span>
+                        {(task.comments?.length > 0) && <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>💬{task.comments.length}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
