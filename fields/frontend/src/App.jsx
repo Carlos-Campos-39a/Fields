@@ -1006,14 +1006,15 @@ function isToday(dateStr) { return dateStr === toISO(new Date()); }
 function fmtTime(t) { return t || ""; }
 
 function AgendaView() {
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [meetings, setMeetings]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [expanded, setExpanded]   = useState(null);   // meeting id with comment section open
-  const [addingTo, setAddingTo]   = useState(null);   // date string for new meeting form
-  const [form, setForm]           = useState({ title: "", start_time: "", end_time: "" });
-  const [commentDraft, setCommentDraft] = useState({}); // meetingId → string
-  const formRef = useRef();
+  const [weekStart, setWeekStart]       = useState(() => getMonday(new Date()));
+  const [meetings, setMeetings]         = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [expanded, setExpanded]         = useState(null);
+  const [addingTo, setAddingTo]         = useState(null);
+  const [form, setForm]                 = useState({ title: "", start_time: "", end_time: "" });
+  const [commentDraft, setCommentDraft] = useState({});
+  const [mustDraft, setMustDraft]       = useState({});
+  const formRef    = useRef();
   const commentRef = useRef();
 
   const days = Array.from({ length: 7 }, (_, i) => shiftDays(weekStart, i));
@@ -1021,7 +1022,6 @@ function AgendaView() {
 
   useEffect(() => { loadWeek(); }, [weekStart]);
   useEffect(() => { if (addingTo) setTimeout(() => formRef.current?.focus(), 40); }, [addingTo]);
-  useEffect(() => { if (expanded) setTimeout(() => commentRef.current?.focus(), 40); }, [expanded]);
 
   async function loadWeek() {
     setLoading(true);
@@ -1040,239 +1040,263 @@ function AgendaView() {
     if (!form.title.trim()) { setAddingTo(null); return; }
     try {
       const { meeting } = await api.createMeeting({ title: form.title.trim(), date, start_time: form.start_time, end_time: form.end_time });
-      setMeetings(prev => [...prev, meeting].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")));
+      setMeetings(prev => [...prev, meeting]);
     } catch (e) { console.error(e); }
     setAddingTo(null); setForm({ title: "", start_time: "", end_time: "" });
   }
 
   async function deleteMeeting(id) {
     setMeetings(prev => prev.filter(m => m.id !== id));
+    if (expanded === id) setExpanded(null);
     await api.deleteMeeting(id);
   }
 
   async function addComment(meeting) {
     const text = (commentDraft[meeting.id] || "").trim();
     if (!text) return;
-    const newComment = { id: Date.now().toString(), text, created_at: new Date().toISOString() };
-    const updatedComments = [...(meeting.comments || []), newComment];
-    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, comments: updatedComments } : m));
+    const newC = { id: Date.now().toString(), text, created_at: new Date().toISOString() };
+    const updated = [...(meeting.comments || []), newC];
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, comments: updated } : m));
     setCommentDraft(prev => ({ ...prev, [meeting.id]: "" }));
-    await api.updateMeeting(meeting.id, { comments: updatedComments });
+    await api.updateMeeting(meeting.id, { comments: updated });
   }
 
-  async function deleteComment(meeting, commentId) {
-    const updatedComments = meeting.comments.filter(c => c.id !== commentId);
-    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, comments: updatedComments } : m));
-    await api.updateMeeting(meeting.id, { comments: updatedComments });
+  async function deleteComment(meeting, cid) {
+    const updated = meeting.comments.filter(c => c.id !== cid);
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, comments: updated } : m));
+    await api.updateMeeting(meeting.id, { comments: updated });
   }
 
-  // Format week range label
+  async function saveMust(meeting) {
+    const val = (mustDraft[meeting.id] ?? meeting.must ?? "");
+    if (val === (meeting.must || "")) return;
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, must: val } : m));
+    await api.updateMeeting(meeting.id, { must: val });
+  }
+
   const startM = weekStart.getMonth(), endM = weekEnd.getMonth();
   const weekLabel = startM === endM
     ? `${weekStart.getDate()}–${weekEnd.getDate()} ${MONTH_LABELS[startM]} ${weekStart.getFullYear()}`
     : `${weekStart.getDate()} ${MONTH_LABELS[startM]} – ${weekEnd.getDate()} ${MONTH_LABELS[endM]} ${weekEnd.getFullYear()}`;
 
-  const navBtn = (label, onClick) => (
-    <button onClick={onClick} style={{
-      background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-      borderRadius: 8, padding: "6px 12px", fontSize: 14, color: "rgba(255,255,255,0.6)",
-      cursor: "pointer", transition: "all 0.15s",
-    }}
-      onMouseEnter={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.1)"; ev.currentTarget.style.color = "white"; }}
-      onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.06)"; ev.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
-    >{label}</button>
-  );
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
 
       {/* ── Week navigation ── */}
-      <div style={{ padding: "20px 24px 14px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {navBtn("←", () => setWeekStart(d => shiftDays(d, -7)))}
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", fontFamily: "var(--font-serif)", letterSpacing: "-0.01em" }}>
-              {weekLabel}
-            </span>
-          </div>
-          {navBtn("→", () => setWeekStart(d => shiftDays(d, 7)))}
-          <button onClick={() => setWeekStart(getMonday(new Date()))} style={{
-            background: "rgba(232,96,44,0.15)", border: "1px solid rgba(232,96,44,0.3)",
-            borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600,
-            color: "#f0956a", cursor: "pointer",
-          }}>Hoje</button>
+      <div style={{ padding: "18px 24px 14px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+        {[["←", () => setWeekStart(d => shiftDays(d, -7))], ["→", () => setWeekStart(d => shiftDays(d, 7))]].map(([lbl, fn], i) => (
+          i === 0 ? <button key={lbl} onClick={fn} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 14px", fontSize: 15, color: "rgba(255,255,255,0.55)", cursor: "pointer" }}
+            onMouseEnter={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.1)"; ev.currentTarget.style.color = "white"; }}
+            onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.06)"; ev.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          >{lbl}</button> : null
+        ))}
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", fontFamily: "var(--font-serif)", letterSpacing: "-0.01em" }}>{weekLabel}</span>
         </div>
+        <button onClick={() => setWeekStart(d => shiftDays(d, 7))} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 14px", fontSize: 15, color: "rgba(255,255,255,0.55)", cursor: "pointer" }}
+          onMouseEnter={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.1)"; ev.currentTarget.style.color = "white"; }}
+          onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.06)"; ev.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        >→</button>
+        <button onClick={() => setWeekStart(getMonday(new Date()))} style={{ background: "rgba(232,96,44,0.15)", border: "1px solid rgba(232,96,44,0.3)", borderRadius: 8, padding: "6px 16px", fontSize: 12, fontWeight: 700, color: "#f0956a", cursor: "pointer" }}>Hoje</button>
       </div>
 
       {/* ── Day columns ── */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 24px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 28px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: "rgba(255,255,255,0.25)", fontSize: 14 }}>Carregando…</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, minWidth: 700 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, minWidth: 840 }}>
             {days.map(day => {
               const dateStr = toISO(day);
-              const isNow = isToday(dateStr);
-              const dayMeetings = byDate[dateStr] || [];
-              const allComments = dayMeetings.flatMap(m =>
-                (m.comments || []).map(c => ({ text: c.text, meeting: m.title }))
-              );
+              const isNow   = isToday(dateStr);
+              const dayMeetings = (byDate[dateStr] || []).slice().sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+              const musts   = dayMeetings.filter(m => m.must?.trim());
+              const allComments = dayMeetings.flatMap(m => m.comments || []);
 
               return (
                 <div key={dateStr} style={{
-                  background: isNow ? "rgba(232,96,44,0.04)" : "#252525",
-                  border: `1px solid ${isNow ? "rgba(232,96,44,0.35)" : "rgba(255,255,255,0.07)"}`,
-                  borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden",
-                  minHeight: 200,
+                  background: isNow ? "rgba(232,96,44,0.035)" : "#252525",
+                  border: `1px solid ${isNow ? "rgba(232,96,44,0.4)" : "rgba(255,255,255,0.07)"}`,
+                  borderRadius: 14, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 240,
                 }}>
 
-                  {/* Day header */}
-                  <div style={{
-                    padding: "10px 12px 8px",
-                    borderBottom: `1px solid ${isNow ? "rgba(232,96,44,0.2)" : "rgba(255,255,255,0.06)"}`,
-                    background: isNow ? "rgba(232,96,44,0.08)" : "rgba(255,255,255,0.02)",
-                  }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: isNow ? "#f0956a" : "rgba(255,255,255,0.35)", marginBottom: 1 }}>
-                      {DAY_LABELS[day.getDay()]}
-                    </div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: isNow ? "#f0956a" : "rgba(255,255,255,0.75)", lineHeight: 1.1, fontFamily: "var(--font-serif)" }}>
-                      {day.getDate()}
-                    </div>
+                  {/* ── Day header ── */}
+                  <div style={{ padding: "12px 12px 10px", borderBottom: `1px solid ${isNow ? "rgba(232,96,44,0.18)" : "rgba(255,255,255,0.06)"}`, background: isNow ? "rgba(232,96,44,0.07)" : "rgba(255,255,255,0.015)" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: isNow ? "#f0956a" : "rgba(255,255,255,0.3)", marginBottom: 2 }}>{DAY_LABELS[day.getDay()]}</div>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: isNow ? "#f0956a" : "rgba(255,255,255,0.8)", lineHeight: 1, fontFamily: "var(--font-serif)" }}>{day.getDate()}</div>
                   </div>
 
-                  {/* Day summary (comments) */}
-                  {allComments.length > 0 && (
-                    <div style={{ padding: "8px 10px 6px", background: "rgba(232,96,44,0.06)", borderBottom: "1px solid rgba(232,96,44,0.12)" }}>
-                      {allComments.slice(0, 3).map((c, i) => (
-                        <div key={i} style={{ display: "flex", gap: 5, alignItems: "flex-start", marginBottom: i < allComments.length - 1 ? 4 : 0 }}>
-                          <span style={{ fontSize: 8, color: "#E8602C", marginTop: 3, flexShrink: 0 }}>◆</span>
-                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>{c.text}</span>
+                  {/* ── Must summary (amber, prominent) ── */}
+                  {musts.length > 0 && (
+                    <div style={{ padding: "10px 12px", background: "rgba(245,158,11,0.07)", borderBottom: "1px solid rgba(245,158,11,0.18)" }}>
+                      <div style={{ fontSize: 9, fontWeight: 800, color: "#f59e0b", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 7, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span>⚑</span> Must do
+                      </div>
+                      {musts.map((m, i) => (
+                        <div key={m.id} style={{ marginBottom: i < musts.length - 1 ? 6 : 0, paddingLeft: 8, borderLeft: "2px solid rgba(245,158,11,0.6)" }}>
+                          <div style={{ fontSize: 9, color: "rgba(245,158,11,0.6)", fontWeight: 700, marginBottom: 1, textTransform: "uppercase", letterSpacing: "0.04em" }}>{m.title}</div>
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.82)", lineHeight: 1.45 }}>{m.must}</div>
                         </div>
                       ))}
-                      {allComments.length > 3 && (
-                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>+{allComments.length - 3} comentário{allComments.length - 3 > 1 ? "s" : ""}</div>
-                      )}
                     </div>
                   )}
 
-                  {/* Meetings list */}
-                  <div style={{ flex: 1, padding: "6px 0", overflowY: "auto" }}>
-                    {dayMeetings
-                      .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
-                      .map(meeting => {
-                        const isExp = expanded === meeting.id;
-                        const hasComments = meeting.comments?.length > 0;
-                        return (
-                          <div key={meeting.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", lastChild: { borderBottom: "none" } }}>
-                            {/* Meeting row */}
-                            <div
-                              onClick={() => setExpanded(isExp ? null : meeting.id)}
-                              style={{ padding: "7px 10px", cursor: "pointer", transition: "background 0.1s" }}
-                              onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.04)"}
-                              onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
-                            >
-                              {(meeting.startTime || meeting.endTime) && (
-                                <div style={{ fontSize: 9, fontWeight: 700, color: isNow ? "#f0956a" : "rgba(255,255,255,0.3)", letterSpacing: "0.04em", marginBottom: 2 }}>
-                                  {fmtTime(meeting.startTime)}{meeting.endTime ? `–${fmtTime(meeting.endTime)}` : ""}
-                                </div>
-                              )}
-                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.82)", flex: 1, lineHeight: 1.3 }}>{meeting.title}</span>
-                                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                                  {hasComments && (
-                                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.07)", borderRadius: 4, padding: "1px 5px" }}>
-                                      💬 {meeting.comments.length}
-                                    </span>
-                                  )}
-                                  <button
-                                    onClick={e => { e.stopPropagation(); deleteMeeting(meeting.id); }}
-                                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: "rgba(255,100,100,0.4)", padding: "0 2px", opacity: 0, transition: "opacity 0.15s" }}
-                                    onMouseEnter={ev => ev.currentTarget.style.opacity = "1"}
-                                    onMouseLeave={ev => ev.currentTarget.style.opacity = "0"}
-                                  >✕</button>
-                                </div>
-                              </div>
-                            </div>
+                  {/* ── Comments summary (orange, secondary) ── */}
+                  {allComments.length > 0 && (
+                    <div style={{ padding: "8px 12px", background: "rgba(232,96,44,0.04)", borderBottom: "1px solid rgba(232,96,44,0.1)" }}>
+                      <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(232,96,44,0.7)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontSize: 8 }}>◆</span> Notas
+                      </div>
+                      {allComments.slice(0, 3).map((c, i) => (
+                        <div key={i} style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.45, marginBottom: i < Math.min(allComments.length, 3) - 1 ? 4 : 0, paddingLeft: 8, borderLeft: "2px solid rgba(232,96,44,0.3)" }}>
+                          {c.text}
+                        </div>
+                      ))}
+                      {allComments.length > 3 && <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", marginTop: 4 }}>+{allComments.length - 3} mais</div>}
+                    </div>
+                  )}
 
-                            {/* Expanded comment section */}
-                            {isExp && (
-                              <div style={{ padding: "0 10px 10px", background: "rgba(0,0,0,0.2)" }}>
-                                {/* Existing comments */}
+                  {/* ── Meetings list ── */}
+                  <div style={{ flex: 1, padding: "8px 8px 4px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                    {dayMeetings.map(meeting => {
+                      const isExp = expanded === meeting.id;
+                      const mustVal = mustDraft[meeting.id] ?? meeting.must ?? "";
+
+                      return (
+                        <div key={meeting.id} style={{
+                          background: isExp ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.04)",
+                          border: isExp ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(255,255,255,0.07)",
+                          borderRadius: 10, overflow: "hidden", transition: "border-color 0.15s",
+                        }}>
+                          {/* Meeting header */}
+                          <div onClick={() => setExpanded(isExp ? null : meeting.id)} style={{ padding: "9px 10px", cursor: "pointer" }}
+                            onMouseEnter={ev => { if (!isExp) ev.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                            onMouseLeave={ev => { ev.currentTarget.style.background = "transparent"; }}
+                          >
+                            {(meeting.startTime || meeting.endTime) && (
+                              <div style={{ fontSize: 9, fontWeight: 700, color: isNow ? "#f0956a" : "rgba(255,255,255,0.3)", letterSpacing: "0.06em", marginBottom: 3 }}>
+                                {meeting.startTime}{meeting.endTime ? ` – ${meeting.endTime}` : ""}
+                              </div>
+                            )}
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 4 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.9)", lineHeight: 1.35, flex: 1 }}>{meeting.title}</span>
+                              <button onClick={e => { e.stopPropagation(); deleteMeeting(meeting.id); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "rgba(255,100,100,0.4)", padding: "0 2px", flexShrink: 0, opacity: 0, transition: "opacity 0.15s" }}
+                                onMouseEnter={ev => ev.currentTarget.style.opacity = "1"}
+                                onMouseLeave={ev => ev.currentTarget.style.opacity = "0"}
+                              >✕</button>
+                            </div>
+                            {/* Must preview when collapsed */}
+                            {meeting.must && !isExp && (
+                              <div style={{ marginTop: 5, display: "flex", gap: 5, alignItems: "flex-start" }}>
+                                <span style={{ fontSize: 8, color: "#f59e0b", flexShrink: 0, marginTop: 1 }}>⚑</span>
+                                <span style={{ fontSize: 10, color: "rgba(245,158,11,0.85)", lineHeight: 1.35 }}>{meeting.must.length > 55 ? meeting.must.slice(0, 55) + "…" : meeting.must}</span>
+                              </div>
+                            )}
+                            {/* Comment count badge */}
+                            {meeting.comments?.length > 0 && !isExp && (
+                              <div style={{ marginTop: 5 }}>
+                                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>💬 {meeting.comments.length}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── Expanded panel ── */}
+                          {isExp && (
+                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+
+                              {/* Comments section */}
+                              <div style={{ padding: "12px 12px 10px" }}>
+                                <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(232,96,44,0.7)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{ fontSize: 8 }}>◆</span> Comentários
+                                </div>
                                 {meeting.comments?.length > 0 && (
-                                  <div style={{ marginBottom: 8, paddingTop: 4 }}>
+                                  <div style={{ marginBottom: 10, display: "flex", flexDirection: "column", gap: 2 }}>
                                     {meeting.comments.map(c => (
-                                      <div key={c.id} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", group: true }}
+                                      <div key={c.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "7px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}
                                         onMouseEnter={ev => ev.currentTarget.querySelector(".del-c").style.opacity = "1"}
                                         onMouseLeave={ev => ev.currentTarget.querySelector(".del-c").style.opacity = "0"}
                                       >
                                         <span style={{ fontSize: 7, color: "#E8602C", marginTop: 4, flexShrink: 0 }}>●</span>
-                                        <span style={{ flex: 1, fontSize: 11, color: "rgba(255,255,255,0.65)", lineHeight: 1.4 }}>{c.text}</span>
+                                        <span style={{ flex: 1, fontSize: 12, color: "rgba(255,255,255,0.78)", lineHeight: 1.5 }}>{c.text}</span>
                                         <button className="del-c" onClick={() => deleteComment(meeting, c.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: "rgba(255,100,100,0.5)", padding: 0, opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>✕</button>
                                       </div>
                                     ))}
                                   </div>
                                 )}
-                                {/* Add comment */}
-                                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                                {/* Add comment input */}
+                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                   <input
-                                    ref={expanded === meeting.id ? commentRef : undefined}
+                                    ref={commentRef}
                                     value={commentDraft[meeting.id] || ""}
                                     onChange={e => setCommentDraft(prev => ({ ...prev, [meeting.id]: e.target.value }))}
-                                    placeholder="Adicionar comentário…"
+                                    placeholder="Adicionar nota…"
                                     onKeyDown={e => { if (e.key === "Enter") addComment(meeting); }}
-                                    style={{
-                                      flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-                                      borderRadius: 8, padding: "5px 9px", fontSize: 11,
-                                      color: "rgba(255,255,255,0.85)", outline: "none",
-                                    }}
+                                    style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "rgba(255,255,255,0.88)", outline: "none" }}
                                     onFocus={ev => ev.currentTarget.style.borderColor = "#E8602C"}
                                     onBlur={ev => ev.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"}
                                   />
                                   <button onClick={() => addComment(meeting)} style={{
                                     background: (commentDraft[meeting.id] || "").trim() ? "#E8602C" : "rgba(255,255,255,0.08)",
-                                    border: "none", borderRadius: 8, padding: "5px 10px",
-                                    fontSize: 11, fontWeight: 700,
-                                    color: (commentDraft[meeting.id] || "").trim() ? "white" : "rgba(255,255,255,0.3)",
+                                    border: "none", borderRadius: 8, padding: "7px 12px", fontSize: 13, fontWeight: 700,
+                                    color: (commentDraft[meeting.id] || "").trim() ? "white" : "rgba(255,255,255,0.25)",
                                     cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
                                   }}>↑</button>
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
 
-                    {/* Add meeting form inline */}
+                              {/* ── Must section (amber) ── */}
+                              <div style={{ padding: "12px 12px 12px", background: "rgba(245,158,11,0.06)", borderTop: "1px solid rgba(245,158,11,0.15)" }}>
+                                <div style={{ fontSize: 9, fontWeight: 800, color: "#f59e0b", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                                  <span>⚑</span> Must
+                                </div>
+                                <textarea
+                                  value={mustVal}
+                                  onChange={e => setMustDraft(prev => ({ ...prev, [meeting.id]: e.target.value }))}
+                                  onBlur={() => saveMust(meeting)}
+                                  placeholder="O que é essencial nessa reunião…"
+                                  rows={3}
+                                  style={{
+                                    width: "100%", background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)",
+                                    borderRadius: 9, padding: "9px 11px", fontSize: 12, color: "rgba(255,255,255,0.88)",
+                                    outline: "none", resize: "none", lineHeight: 1.55, boxSizing: "border-box",
+                                  }}
+                                  onFocus={ev => ev.currentTarget.style.borderColor = "#f59e0b"}
+                                  onBlur={ev => { ev.currentTarget.style.borderColor = "rgba(245,158,11,0.2)"; saveMust(meeting); }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Add meeting form */}
                     {addingTo === dateStr ? (
-                      <div style={{ padding: "8px 10px", borderTop: dayMeetings.length ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                        <input
-                          ref={formRef}
-                          value={form.title}
-                          onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(232,96,44,0.35)", borderRadius: 10, padding: "10px 10px 8px" }}>
+                        <input ref={formRef} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                           placeholder="Título da reunião…"
-                          onKeyDown={e => { if (e.key === "Enter") addMeeting(dateStr); if (e.key === "Escape") { setAddingTo(null); } }}
-                          style={{ width: "100%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(232,96,44,0.4)", borderRadius: 8, padding: "5px 9px", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.9)", outline: "none", marginBottom: 5, boxSizing: "border-box" }}
+                          onKeyDown={e => { if (e.key === "Enter") addMeeting(dateStr); if (e.key === "Escape") setAddingTo(null); }}
+                          style={{ width: "100%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.92)", outline: "none", marginBottom: 7, boxSizing: "border-box" }}
                         />
-                        <div style={{ display: "flex", gap: 4 }}>
+                        <div style={{ display: "flex", gap: 5, marginBottom: 7 }}>
                           <input value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} type="time"
-                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 6px", fontSize: 10, color: "rgba(255,255,255,0.7)", outline: "none", colorScheme: "dark" }}
+                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 7px", fontSize: 11, color: "rgba(255,255,255,0.7)", outline: "none", colorScheme: "dark" }}
                           />
                           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", alignSelf: "center" }}>–</span>
                           <input value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} type="time"
-                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 6px", fontSize: 10, color: "rgba(255,255,255,0.7)", outline: "none", colorScheme: "dark" }}
+                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 7px", fontSize: 11, color: "rgba(255,255,255,0.7)", outline: "none", colorScheme: "dark" }}
                           />
                         </div>
-                        <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
-                          <button onClick={() => addMeeting(dateStr)} style={{ flex: 1, background: "#E8602C", border: "none", borderRadius: 7, padding: "5px 0", fontSize: 10, fontWeight: 700, color: "white", cursor: "pointer" }}>Salvar</button>
-                          <button onClick={() => setAddingTo(null)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", fontSize: 10, color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>✕</button>
+                        <div style={{ display: "flex", gap: 5 }}>
+                          <button onClick={() => addMeeting(dateStr)} style={{ flex: 1, background: "#E8602C", border: "none", borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700, color: "white", cursor: "pointer" }}>Salvar</button>
+                          <button onClick={() => setAddingTo(null)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "7px 11px", fontSize: 11, color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>✕</button>
                         </div>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => { setAddingTo(dateStr); setForm({ title: "", start_time: "", end_time: "" }); }}
-                        style={{ width: "100%", background: "none", border: "none", padding: "8px 10px", fontSize: 11, color: "rgba(255,255,255,0.18)", cursor: "pointer", textAlign: "left", transition: "color 0.15s" }}
-                        onMouseEnter={ev => ev.currentTarget.style.color = "rgba(255,255,255,0.5)"}
-                        onMouseLeave={ev => ev.currentTarget.style.color = "rgba(255,255,255,0.18)"}
+                      <button onClick={() => { setAddingTo(dateStr); setForm({ title: "", start_time: "", end_time: "" }); setExpanded(null); }}
+                        style={{ width: "100%", background: "none", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px", fontSize: 11, color: "rgba(255,255,255,0.2)", cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}
+                        onMouseEnter={ev => { ev.currentTarget.style.borderColor = "rgba(232,96,44,0.35)"; ev.currentTarget.style.color = "#f0956a"; }}
+                        onMouseLeave={ev => { ev.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; ev.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
                       >+ reunião</button>
                     )}
                   </div>

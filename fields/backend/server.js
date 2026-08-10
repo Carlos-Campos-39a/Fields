@@ -74,8 +74,10 @@ async function initDB() {
       end_time    TEXT        NOT NULL DEFAULT '',
       description TEXT        NOT NULL DEFAULT '',
       comments    JSONB       NOT NULL DEFAULT '[]',
+      must        TEXT        NOT NULL DEFAULT '',
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE meetings ADD COLUMN IF NOT EXISTS must TEXT NOT NULL DEFAULT '';
   `);
 
   // Seed if empty
@@ -107,7 +109,7 @@ async function initDB() {
 
 // ─── Helpers: row → object ───────────────────────────────────
 function toMeeting(r) {
-  return { id: r.id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time, description: r.description, comments: r.comments ?? [], createdAt: r.created_at };
+  return { id: r.id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time, description: r.description, comments: r.comments ?? [], must: r.must ?? "", createdAt: r.created_at };
 }
 function toProject(r) {
   return { id: r.id, name: r.name, status: r.status, holder: r.holder };
@@ -435,7 +437,7 @@ app.post("/api/meetings", async (req, res) => {
 // PATCH /api/meetings/:id
 app.patch("/api/meetings/:id", async (req, res) => {
   try {
-    const allowed = ["title", "date", "start_time", "end_time", "description", "comments"];
+    const allowed = ["title", "date", "start_time", "end_time", "description", "comments", "must"];
     const sets = []; const params = [];
     allowed.forEach(f => {
       if (req.body[f] !== undefined) {
