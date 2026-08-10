@@ -646,14 +646,52 @@ function CardsView({ entries, onOpen }) {
 }
 
 // ─── Input Bar ───────────────────────────────────────────────
-function InputBar({ onCreated }) {
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const ref = useRef();
+function InputBar({ onCreated, bordered = false }) {
+  const [text, setText]               = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [focused, setFocused]         = useState(false);
+  const [linkedTask, setLinkedTask]   = useState(null);
+  const [showPicker, setShowPicker]   = useState(false);
+  const [pickerPos, setPickerPos]     = useState({ top: 0, left: 0 });
+  const [pickerProjs, setPickerProjs] = useState(null);
+  const [pickerLoad, setPickerLoad]   = useState(false);
+  const ref          = useRef();
+  const pickerBtnRef = useRef();
+  const pickerPanRef = useRef();
 
   const detected = text.trim() ? parseInput(text) : null;
   const meta = detected ? TYPE[detected.type] : null;
+
+  useEffect(() => {
+    if (!showPicker) return;
+    function handler(e) {
+      if (pickerBtnRef.current?.contains(e.target)) return;
+      if (pickerPanRef.current?.contains(e.target)) return;
+      setShowPicker(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showPicker]);
+
+  async function openPicker(e) {
+    e.stopPropagation();
+    if (showPicker) { setShowPicker(false); return; }
+    const rect = pickerBtnRef.current.getBoundingClientRect();
+    setPickerPos({ top: rect.top, left: rect.left });
+    setShowPicker(true);
+    if (!pickerProjs) {
+      setPickerLoad(true);
+      try { const { projects } = await api.getProjects(); setPickerProjs(projects); }
+      catch { setPickerProjs([]); }
+      finally { setPickerLoad(false); }
+    }
+  }
+
+  function selectTask(proj, frente, task) {
+    setLinkedTask({ taskId: task.id, taskName: task.name, frenteName: frente.name, projName: proj.name, currentComments: task.comments || [] });
+    setShowPicker(false);
+    ref.current?.focus();
+  }
 
   async function submit() {
     if (!text.trim() || loading) return;
@@ -666,6 +704,11 @@ function InputBar({ onCreated }) {
       });
       onCreated(entry);
       setText("");
+      if (linkedTask) {
+        const cmt = { id: crypto.randomUUID(), text: body, created_at: new Date().toISOString() };
+        await api.updateTask(linkedTask.taskId, { comments: [...linkedTask.currentComments, cmt] });
+        setLinkedTask(null);
+      }
     } finally { setLoading(false); }
   }
 
@@ -682,7 +725,7 @@ function InputBar({ onCreated }) {
   }
 
   return (
-    <div style={{ padding: "12px 24px 20px", background: "#1e1e1e", flexShrink: 0, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+    <div style={{ padding: "12px 24px 20px", background: bordered ? "#1e1e1e" : "transparent", flexShrink: 0, ...(bordered ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }}>
       <div style={{ maxWidth: 720, margin: "0 auto", position: "relative" }}>
         {meta && (
           <div style={{
@@ -696,8 +739,28 @@ function InputBar({ onCreated }) {
             <span>{meta.icon}</span>{meta.label}
           </div>
         )}
+
+        {/* Linked task chip */}
+        {linkedTask && (
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>→ task</span>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              background: "rgba(232,96,44,0.12)", border: "1px solid rgba(232,96,44,0.3)",
+              borderRadius: 20, padding: "3px 10px 3px 12px",
+            }}>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{linkedTask.projName}</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>›</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{linkedTask.frenteName}</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>›</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#f0956a" }}>{linkedTask.taskName}</span>
+              <button onClick={() => setLinkedTask(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.28)", fontSize: 13, padding: "0 0 0 3px", lineHeight: 1 }}>×</button>
+            </div>
+          </div>
+        )}
+
         <div style={{
-          display: "flex", alignItems: "flex-end", gap: 10,
+          display: "flex", alignItems: "flex-end", gap: 8,
           background: focused ? "#2a2a2a" : "#232323",
           border: `1.5px solid ${focused ? "#E8602C" : "rgba(255,255,255,0.1)"}`,
           borderRadius: 16, padding: "12px 14px",
@@ -719,6 +782,20 @@ function InputBar({ onCreated }) {
               lineHeight: 1.6, maxHeight: 160, overflowY: "auto",
             }}
           />
+          {/* Task picker button */}
+          <button ref={pickerBtnRef} onClick={openPicker} title="Vincular a uma task" style={{
+            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+            background: linkedTask ? "rgba(232,96,44,0.2)" : "rgba(255,255,255,0.07)",
+            border: `1px solid ${linkedTask ? "rgba(232,96,44,0.4)" : "rgba(255,255,255,0.1)"}`,
+            color: linkedTask ? "#E8602C" : "rgba(255,255,255,0.35)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", transition: "all 0.15s",
+          }}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5.5L2 15V2a1 1 0 0 1 1-1z"/>
+            </svg>
+          </button>
+          {/* Send button */}
           <button onClick={submit} disabled={!text.trim() || loading} style={{
             width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
             background: text.trim() ? "#E8602C" : "rgba(255,255,255,0.1)",
@@ -734,6 +811,58 @@ function InputBar({ onCreated }) {
           Enter para registrar · Alt+Enter para nova linha
         </div>
       </div>
+
+      {/* Task picker portal */}
+      {showPicker && ReactDOM.createPortal(
+        <div ref={pickerPanRef} style={{
+          position: "fixed", top: pickerPos.top, left: pickerPos.left,
+          transform: "translateY(-100%) translateY(-8px)",
+          zIndex: 10000, width: 310, maxHeight: 360, overflowY: "auto",
+          background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.13)",
+          borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
+        }}>
+          <div style={{ padding: "11px 14px 9px", borderBottom: "1px solid rgba(255,255,255,0.07)", position: "sticky", top: 0, background: "#1e1e1e", zIndex: 1 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Vincular a task</span>
+          </div>
+          {pickerLoad ? (
+            <div style={{ padding: "20px 14px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>Carregando…</div>
+          ) : !pickerProjs || pickerProjs.length === 0 ? (
+            <div style={{ padding: "16px 14px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>Nenhum projeto encontrado.</div>
+          ) : pickerProjs.map(proj => (
+            <div key={proj.id}>
+              <div style={{ padding: "9px 14px 4px", fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.02)" }}>
+                {proj.name}
+              </div>
+              {proj.frentes?.map(frente => (
+                <div key={frente.id}>
+                  <div style={{ padding: "4px 14px 2px 22px", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)" }}>
+                    ▸ {frente.name}
+                  </div>
+                  {frente.tasks?.filter(t => t.status !== "Concluído").map(task => {
+                    const isSel = linkedTask?.taskId === task.id;
+                    return (
+                      <div key={task.id} onClick={() => selectTask(proj, frente, task)} style={{
+                        padding: "7px 14px 7px 32px", fontSize: 12, cursor: "pointer",
+                        color: isSel ? "#f0956a" : "rgba(255,255,255,0.7)",
+                        background: isSel ? "rgba(232,96,44,0.1)" : "transparent",
+                        display: "flex", alignItems: "center", gap: 6, transition: "background 0.1s",
+                      }}
+                        onMouseEnter={ev => { if (!isSel) ev.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                        onMouseLeave={ev => { if (!isSel) ev.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span style={{ fontSize: 8, color: isSel ? "#E8602C" : "rgba(255,255,255,0.2)", flexShrink: 0 }}>{isSel ? "●" : "◦"}</span>
+                        <span style={{ flex: 1 }}>{task.name || "—"}</span>
+                        {task.comments?.length > 0 && <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>💬 {task.comments.length}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -2119,7 +2248,7 @@ export default function App() {
           </div>
 
           {/* Input */}
-          {activeView === "entries" && !showCards && <InputBar onCreated={handleCreated} />}
+          {activeView === "entries" && !showCards && <InputBar onCreated={handleCreated} bordered />}
         </div>
       )}
 
