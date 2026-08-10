@@ -742,6 +742,145 @@ function HolderToggle({ value, onChange }) {
   );
 }
 
+function TaskCommentBubble({ comments = [], onSave }) {
+  const [open, setOpen]   = useState(false);
+  const [pos, setPos]     = useState({ top: 0, left: 0 });
+  const [text, setText]   = useState("");
+  const triggerRef        = useRef();
+  const panelRef          = useRef();
+  const textRef           = useRef();
+  const count             = comments.length;
+
+  function handleToggle(e) {
+    e.stopPropagation();
+    if (open) { setOpen(false); return; }
+    const rect = triggerRef.current.getBoundingClientRect();
+    const panelW = 288;
+    const left = Math.min(rect.left, window.innerWidth - panelW - 12);
+    setPos({ top: rect.bottom + 6, left: Math.max(8, left) });
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    setTimeout(() => textRef.current?.focus(), 60);
+    function handler(e) {
+      if (triggerRef.current?.contains(e.target)) return;
+      if (panelRef.current?.contains(e.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  function addComment() {
+    if (!text.trim()) return;
+    const next = [...comments, { id: crypto.randomUUID(), text: text.trim(), created_at: new Date().toISOString() }];
+    onSave(next);
+    setText("");
+  }
+
+  function deleteComment(id) {
+    onSave(comments.filter(c => c.id !== id));
+  }
+
+  function fmtDate(iso) {
+    try {
+      return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    } catch { return ""; }
+  }
+
+  return (
+    <div ref={triggerRef} style={{ display: "inline-flex" }}>
+      <button onClick={handleToggle} title="Comentários" style={{
+        background: "none", border: "none", cursor: "pointer",
+        display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 5px",
+        color: count > 0 ? "#E8602C" : "rgba(255,255,255,0.18)", transition: "color 0.15s",
+        borderRadius: 5, flexShrink: 0,
+      }}
+        onMouseEnter={ev => ev.currentTarget.style.color = count > 0 ? "#f0956a" : "rgba(255,255,255,0.45)"}
+        onMouseLeave={ev => ev.currentTarget.style.color = count > 0 ? "#E8602C" : "rgba(255,255,255,0.18)"}
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M2 1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5.5L2 15V2a1 1 0 0 1 1-1z"/>
+        </svg>
+        {count > 0 && <span style={{ fontSize: 9, fontWeight: 800, lineHeight: 1 }}>{count}</span>}
+      </button>
+
+      {open && ReactDOM.createPortal(
+        <div ref={panelRef} style={{
+          position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
+          width: 288, background: "#1e1e1e",
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.75)",
+          overflow: "hidden", display: "flex", flexDirection: "column",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "11px 14px 9px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              Comentários {count > 0 && <span style={{ color: "#E8602C" }}>{count}</span>}
+            </span>
+            <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.25)", fontSize: 14, padding: "0 2px", lineHeight: 1 }}>×</button>
+          </div>
+
+          {/* Comment list */}
+          <div style={{ maxHeight: 240, overflowY: "auto", padding: count === 0 ? "14px 14px" : "6px 0" }}>
+            {count === 0 ? (
+              <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.22)", fontStyle: "italic" }}>Nenhum comentário ainda.</p>
+            ) : comments.map(c => (
+              <div key={c.id} style={{
+                padding: "9px 14px",
+                borderBottom: "1px solid rgba(255,255,255,0.05)",
+                position: "relative",
+              }}
+                onMouseEnter={ev => ev.currentTarget.querySelector(".del-cmt").style.opacity = "1"}
+                onMouseLeave={ev => ev.currentTarget.querySelector(".del-cmt").style.opacity = "0"}
+              >
+                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.82)", lineHeight: 1.45 }}>{c.text}</p>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", marginTop: 4, display: "block" }}>{fmtDate(c.created_at)}</span>
+                <button className="del-cmt" onClick={() => deleteComment(c.id)} style={{
+                  position: "absolute", top: 8, right: 10, background: "none", border: "none",
+                  cursor: "pointer", color: "rgba(255,100,100,0.5)", fontSize: 10, opacity: 0,
+                  transition: "opacity 0.12s", padding: "2px 4px",
+                }}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: "10px 10px 10px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 7, alignItems: "flex-end" }}>
+            <textarea
+              ref={textRef}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addComment(); } }}
+              placeholder="Adicionar comentário… (Enter)"
+              rows={2}
+              style={{
+                flex: 1, background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.09)",
+                borderRadius: 8, padding: "7px 10px", fontSize: 12,
+                color: "rgba(255,255,255,0.85)", outline: "none",
+                resize: "none", fontFamily: "inherit", lineHeight: 1.4,
+                transition: "border-color 0.15s",
+              }}
+              onFocus={ev => ev.target.style.borderColor = "rgba(232,96,44,0.5)"}
+              onBlur={ev => ev.target.style.borderColor = "rgba(255,255,255,0.09)"}
+            />
+            <button onClick={addComment} style={{
+              background: "#E8602C", border: "none", borderRadius: 8,
+              width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+              color: "white", fontSize: 16, cursor: "pointer", flexShrink: 0,
+              boxShadow: "0 2px 8px rgba(232,96,44,0.35)",
+            }}>↑</button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function ProjectsView() {
   const [projects, setProjects]   = useState([]);
   const [collapsed, setCollapsed] = useState({});
@@ -931,6 +1070,10 @@ function ProjectsView() {
                               <div style={{ flex: 1, textDecoration: isDone ? "line-through" : "none" }}>
                                 <EditableCell value={task.name} onSave={v => saveTask(proj.id, frente.id, task.id, { name: v })} placeholder="Tarefa" />
                               </div>
+                              <TaskCommentBubble
+                                comments={task.comments || []}
+                                onSave={comments => saveTask(proj.id, frente.id, task.id, { comments })}
+                              />
                               <button className="del-task" onClick={() => delTask(proj.id, frente.id, task.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,100,100,0.5)", fontSize: 10, opacity: 0, transition: "opacity 0.15s", padding: "2px 4px", flexShrink: 0 }}>✕</button>
                             </div>
                           </td>
