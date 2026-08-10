@@ -610,6 +610,682 @@ function InputBar({ onCreated }) {
   );
 }
 
+// ─── Projects View ───────────────────────────────────────────
+const PROJ_STATUS_LIST = ["Em andamento", "Pendente", "Marcado", "Em definição", "Não iniciado", "Concluído"];
+const PROJ_STATUS_COLOR = {
+  "Em andamento": "#E8602C",
+  "Pendente":     "#d97706",
+  "Marcado":      "#7c3aed",
+  "Em definição": "rgba(255,255,255,0.4)",
+  "Não iniciado": "rgba(255,255,255,0.22)",
+  "Concluído":    "#10b981",
+};
+
+function StatusBadge({ value, onChange, small }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  const color = PROJ_STATUS_COLOR[value] || "rgba(255,255,255,0.3)";
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e) { if (!ref.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+      <span onClick={e => { e.stopPropagation(); setOpen(v => !v); }} style={{
+        display: "inline-block", fontSize: small ? 10 : 11, fontWeight: 700,
+        padding: small ? "2px 7px" : "3px 10px", borderRadius: "var(--r-full)",
+        background: color === "rgba(255,255,255,0.22)" || color === "rgba(255,255,255,0.4)"
+          ? "rgba(255,255,255,0.06)" : `${color}18`,
+        color, border: `1px solid ${color === "rgba(255,255,255,0.22)" || color === "rgba(255,255,255,0.4)"
+          ? "rgba(255,255,255,0.1)" : `${color}40`}`,
+        cursor: "pointer", whiteSpace: "nowrap", letterSpacing: "0.01em",
+      }}>{value || "—"}</span>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200,
+          background: "#2a2a2a", border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 10, padding: "4px 0", minWidth: 148,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+        }}>
+          {PROJ_STATUS_LIST.map(s => (
+            <div key={s} onClick={e => { e.stopPropagation(); onChange(s); setOpen(false); }} style={{
+              padding: "7px 14px", fontSize: 12, cursor: "pointer",
+              color: PROJ_STATUS_COLOR[s], transition: "background 0.1s",
+            }}
+              onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+              onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+            >{s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditableCell({ value, onSave, placeholder = "—", bold, large }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const inputRef = useRef();
+
+  useEffect(() => { setVal(value || ""); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = val.trim();
+    if (trimmed !== (value || "").trim()) onSave(trimmed);
+  }
+
+  if (editing) return (
+    <input ref={inputRef} value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setVal(value || ""); setEditing(false); } }}
+      style={{
+        background: "rgba(255,255,255,0.08)", border: "1px solid #E8602C",
+        borderRadius: 6, padding: "3px 8px", fontSize: large ? 13 : 12, fontWeight: bold ? 700 : 400,
+        color: "rgba(255,255,255,0.9)", outline: "none", width: "100%", boxSizing: "border-box",
+      }}
+    />
+  );
+
+  return (
+    <span onClick={() => { setVal(value || ""); setEditing(true); }} style={{
+      display: "block", fontSize: large ? 13 : 12, fontWeight: bold ? 700 : 400, cursor: "text",
+      color: value ? (bold ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.7)") : "rgba(255,255,255,0.2)",
+      padding: "2px 4px", borderRadius: 4, transition: "background 0.1s",
+    }}
+      onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+      onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+    >{value || placeholder}</span>
+  );
+}
+
+function HolderToggle({ value, onChange }) {
+  const isNos = value === "Nós";
+  return (
+    <span onClick={() => onChange(isNos ? "Eles" : "Nós")} style={{
+      fontSize: 11, fontWeight: 700, cursor: "pointer",
+      color: isNos ? "#f0956a" : "rgba(255,255,255,0.4)",
+      padding: "2px 4px", borderRadius: 4, transition: "all 0.1s",
+    }}
+      onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.07)"}
+      onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+    >{value || "—"}</span>
+  );
+}
+
+function ProjectsView() {
+  const [projects, setProjects]   = useState([]);
+  const [collapsed, setCollapsed] = useState({});
+  const [loading, setLoading]     = useState(true);
+  const [adding, setAdding]       = useState(null); // { type, parentId }
+  const [addVal, setAddVal]       = useState("");
+  const addRef = useRef();
+
+  useEffect(() => { load(); }, []);
+  useEffect(() => { if (adding) setTimeout(() => addRef.current?.focus(), 40); }, [adding]);
+
+  async function load() {
+    setLoading(true);
+    try { const { projects: p } = await api.getProjects(); setProjects(p); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }
+
+  function toggle(id) { setCollapsed(prev => ({ ...prev, [id]: !prev[id] })); }
+
+  // ── Optimistic updaters ──
+  function updProj(id, patch) { setProjects(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p)); }
+  function updFrente(pid, fid, patch) { setProjects(prev => prev.map(p => p.id === pid ? { ...p, frentes: p.frentes.map(f => f.id === fid ? { ...f, ...patch } : f) } : p)); }
+  function updTask(pid, fid, tid, patch) {
+    setProjects(prev => prev.map(p => p.id === pid ? { ...p, frentes: p.frentes.map(f => f.id === fid ? { ...f, tasks: f.tasks.map(t => t.id === tid ? { ...t, ...patch } : t) } : f) } : p));
+  }
+
+  async function saveProject(id, patch)         { updProj(id, patch);            await api.updateProject(id, patch); }
+  async function saveFrente(pid, fid, patch)    { updFrente(pid, fid, patch);    await api.updateFrente(fid, patch); }
+  async function saveTask(pid, fid, tid, patch) { updTask(pid, fid, tid, patch); await api.updateTask(tid, patch); }
+
+  async function delProject(id) {
+    if (!window.confirm("Excluir projeto e tudo dentro dele?")) return;
+    setProjects(prev => prev.filter(p => p.id !== id));
+    await api.deleteProject(id);
+  }
+  async function delFrente(pid, fid) {
+    setProjects(prev => prev.map(p => p.id === pid ? { ...p, frentes: p.frentes.filter(f => f.id !== fid) } : p));
+    await api.deleteFrente(fid);
+  }
+  async function delTask(pid, fid, tid) {
+    setProjects(prev => prev.map(p => p.id === pid ? { ...p, frentes: p.frentes.map(f => f.id === fid ? { ...f, tasks: f.tasks.filter(t => t.id !== tid) } : f) } : p));
+    await api.deleteTask(tid);
+  }
+
+  async function commitAdd() {
+    const name = addVal.trim();
+    if (!name) { setAdding(null); setAddVal(""); return; }
+    try {
+      if (adding.type === "project") {
+        const { project } = await api.createProject({ name });
+        setProjects(prev => [...prev, project]);
+      } else if (adding.type === "frente") {
+        const { frente } = await api.createFrente(adding.parentId, { name });
+        setProjects(prev => prev.map(p => p.id === adding.parentId ? { ...p, frentes: [...p.frentes, frente] } : p));
+        setCollapsed(prev => ({ ...prev, [adding.parentId]: false }));
+      } else if (adding.type === "task") {
+        const { task } = await api.createTask(adding.parentId, { name });
+        setProjects(prev => prev.map(p => ({ ...p, frentes: p.frentes.map(f => f.id === adding.parentId ? { ...f, tasks: [...f.tasks, task] } : f) })));
+      }
+    } catch (e) { console.error(e); }
+    setAdding(null); setAddVal("");
+  }
+
+  const thStyle = { fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.28)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "10px 12px", textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.08)", userSelect: "none" };
+  const tdBorder = { borderTop: "1px solid rgba(255,255,255,0.05)" };
+
+  if (loading) return <div style={{ textAlign: "center", padding: "80px 40px", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Carregando projetos…</div>;
+
+  return (
+    <div style={{ padding: "28px 28px 60px", overflowX: "auto" }}>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 600, color: "rgba(255,255,255,0.92)", margin: 0, letterSpacing: "-0.02em" }}>
+            Acompanhamento de Projetos
+          </h2>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.28)", marginTop: 4 }}>
+            Status, prazo e responsável por frente de trabalho
+          </p>
+        </div>
+        <button onClick={() => { setAdding({ type: "project" }); setAddVal(""); }} style={{
+          background: "#E8602C", border: "none", borderRadius: "var(--r-full)",
+          padding: "8px 18px", fontSize: 12, fontWeight: 700, color: "white", cursor: "pointer",
+          boxShadow: "0 2px 12px rgba(232,96,44,0.35)", flexShrink: 0,
+        }}>+ Novo projeto</button>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: "#232323", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "36%" }} /><col style={{ width: "21%" }} />
+            <col style={{ width: "15%" }} /><col style={{ width: "12%" }} />
+            <col style={{ width: "10%" }} /><col style={{ width: "6%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th style={thStyle}>Projeto / Frente / Tarefa</th>
+              <th style={thStyle}>Ação</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Stakeholder</th>
+              <th style={thStyle}>Deadline</th>
+              <th style={thStyle}>Holder</th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map((proj, pi) => {
+              const isCollapsed = collapsed[proj.id];
+              return (
+                <>
+                  {/* ── Project row ── */}
+                  <tr key={proj.id} style={{ background: pi % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent" }}>
+                    <td style={{ padding: "11px 12px", ...(pi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}
+                        onMouseEnter={ev => ev.currentTarget.querySelector(".del-proj").style.opacity = "1"}
+                        onMouseLeave={ev => ev.currentTarget.querySelector(".del-proj").style.opacity = "0"}
+                      >
+                        <button onClick={() => toggle(proj.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(255,255,255,0.3)", fontSize: 10, flexShrink: 0, width: 14 }}>
+                          {isCollapsed ? "▶" : "▼"}
+                        </button>
+                        <div style={{ flex: 1 }}>
+                          <EditableCell value={proj.name} bold large onSave={v => saveProject(proj.id, { name: v })} placeholder="Projeto" />
+                        </div>
+                        <button className="del-proj" onClick={() => delProject(proj.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,100,100,0.5)", fontSize: 11, opacity: 0, transition: "opacity 0.15s", padding: "2px 4px", flexShrink: 0 }}>✕</button>
+                      </div>
+                    </td>
+                    <td style={{ padding: "11px 12px", ...(pi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }} />
+                    <td style={{ padding: "11px 12px", ...(pi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }}>
+                      <StatusBadge value={proj.status} onChange={v => saveProject(proj.id, { status: v })} />
+                    </td>
+                    <td style={{ padding: "11px 12px", ...(pi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }} />
+                    <td style={{ padding: "11px 12px", ...(pi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }} />
+                    <td style={{ padding: "11px 12px", ...(pi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : {}) }}>
+                      <HolderToggle value={proj.holder} onChange={v => saveProject(proj.id, { holder: v })} />
+                    </td>
+                  </tr>
+
+                  {/* ── Frentes + Tasks ── */}
+                  {!isCollapsed && proj.frentes.map(frente => (
+                    <>
+                      {/* Frente header */}
+                      <tr key={frente.id} style={{ background: "rgba(0,0,0,0.12)" }}>
+                        <td colSpan={6} style={{ padding: "7px 12px 7px 32px", ...tdBorder }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 7 }}
+                            onMouseEnter={ev => ev.currentTarget.querySelector(".del-fr").style.opacity = "1"}
+                            onMouseLeave={ev => ev.currentTarget.querySelector(".del-fr").style.opacity = "0"}
+                          >
+                            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>▸</span>
+                            <div style={{ flex: 1 }}>
+                              <EditableCell value={frente.name} bold onSave={v => saveFrente(proj.id, frente.id, { name: v })} placeholder="Frente" />
+                            </div>
+                            <button onClick={() => { setAdding({ type: "task", parentId: frente.id }); setAddVal(""); }} style={{
+                              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: "var(--r-full)", padding: "2px 9px", fontSize: 10, fontWeight: 700,
+                              color: "rgba(255,255,255,0.3)", cursor: "pointer", flexShrink: 0,
+                            }}>+ task</button>
+                            <button className="del-fr" onClick={() => delFrente(proj.id, frente.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,100,100,0.5)", fontSize: 10, opacity: 0, transition: "opacity 0.15s", padding: "2px 4px", flexShrink: 0 }}>✕</button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Task rows */}
+                      {frente.tasks.map(task => (
+                        <tr key={task.id} style={{ background: "rgba(0,0,0,0.2)" }}
+                          onMouseEnter={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.015)"; ev.currentTarget.querySelector(".del-task").style.opacity = "1"; }}
+                          onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(0,0,0,0.2)"; ev.currentTarget.querySelector(".del-task").style.opacity = "0"; }}
+                        >
+                          <td style={{ padding: "6px 12px 6px 48px", ...tdBorder }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.15)", flexShrink: 0 }}>◦</span>
+                              <div style={{ flex: 1 }}>
+                                <EditableCell value={task.name} onSave={v => saveTask(proj.id, frente.id, task.id, { name: v })} placeholder="Tarefa" />
+                              </div>
+                              <button className="del-task" onClick={() => delTask(proj.id, frente.id, task.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,100,100,0.5)", fontSize: 10, opacity: 0, transition: "opacity 0.15s", padding: "2px 4px", flexShrink: 0 }}>✕</button>
+                            </div>
+                          </td>
+                          <td style={{ padding: "6px 12px", ...tdBorder }}>
+                            <EditableCell value={task.acao} onSave={v => saveTask(proj.id, frente.id, task.id, { acao: v })} placeholder="—" />
+                          </td>
+                          <td style={{ padding: "6px 12px", ...tdBorder }}>
+                            <StatusBadge value={task.status} small onChange={v => saveTask(proj.id, frente.id, task.id, { status: v })} />
+                          </td>
+                          <td style={{ padding: "6px 12px", ...tdBorder }}>
+                            <EditableCell value={task.stakeholder} onSave={v => saveTask(proj.id, frente.id, task.id, { stakeholder: v })} placeholder="—" />
+                          </td>
+                          <td style={{ padding: "6px 12px", ...tdBorder }}>
+                            <EditableCell value={task.deadline} onSave={v => saveTask(proj.id, frente.id, task.id, { deadline: v })} placeholder="—" />
+                          </td>
+                          <td style={{ padding: "6px 12px", ...tdBorder }}>
+                            <HolderToggle value={task.holder} onChange={v => saveTask(proj.id, frente.id, task.id, { holder: v })} />
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* Inline: add task */}
+                      {adding?.type === "task" && adding?.parentId === frente.id && (
+                        <tr key="add-task">
+                          <td colSpan={6} style={{ padding: "6px 12px 6px 48px", ...tdBorder }}>
+                            <input ref={addRef} value={addVal} onChange={e => setAddVal(e.target.value)}
+                              placeholder="Nome da tarefa… (Enter para salvar)"
+                              onKeyDown={e => { if (e.key === "Enter") commitAdd(); if (e.key === "Escape") { setAdding(null); setAddVal(""); } }}
+                              onBlur={commitAdd}
+                              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(232,96,44,0.5)", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "rgba(255,255,255,0.9)", outline: "none", width: "55%" }}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+
+                  {/* Inline: add frente */}
+                  {!isCollapsed && (
+                    adding?.type === "frente" && adding?.parentId === proj.id ? (
+                      <tr key="add-frente">
+                        <td colSpan={6} style={{ padding: "6px 12px 8px 32px", ...tdBorder }}>
+                          <input ref={addRef} value={addVal} onChange={e => setAddVal(e.target.value)}
+                            placeholder="Nome da frente… (Enter para salvar)"
+                            onKeyDown={e => { if (e.key === "Enter") commitAdd(); if (e.key === "Escape") { setAdding(null); setAddVal(""); } }}
+                            onBlur={commitAdd}
+                            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(232,96,44,0.5)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.9)", outline: "none", width: "45%" }}
+                          />
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key="add-frente-btn">
+                        <td colSpan={6} style={{ padding: "4px 12px 8px 32px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+                          <button onClick={() => { setAdding({ type: "frente", parentId: proj.id }); setAddVal(""); }} style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            fontSize: 11, color: "rgba(255,255,255,0.2)", padding: "2px 0", transition: "color 0.15s",
+                          }}
+                            onMouseEnter={ev => ev.currentTarget.style.color = "rgba(255,255,255,0.5)"}
+                            onMouseLeave={ev => ev.currentTarget.style.color = "rgba(255,255,255,0.2)"}
+                          >+ frente</button>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </>
+              );
+            })}
+
+            {/* Inline: add project */}
+            {adding?.type === "project" && (
+              <tr>
+                <td colSpan={6} style={{ padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <input ref={adding.type === "project" ? addRef : undefined} value={addVal} onChange={e => setAddVal(e.target.value)}
+                    placeholder="Nome do projeto… (Enter para salvar)"
+                    onKeyDown={e => { if (e.key === "Enter") commitAdd(); if (e.key === "Escape") { setAdding(null); setAddVal(""); } }}
+                    onBlur={commitAdd}
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(232,96,44,0.5)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.9)", outline: "none", width: "40%" }}
+                  />
+                </td>
+              </tr>
+            )}
+
+            {projects.length === 0 && !adding && (
+              <tr>
+                <td colSpan={6} style={{ padding: "60px 40px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: 14 }}>
+                  Nenhum projeto ainda. Clique em "+ Novo projeto" para começar.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Agenda View ─────────────────────────────────────────────
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const MONTH_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff); d.setHours(0, 0, 0, 0);
+  return d;
+}
+function shiftDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function toISO(date) { return date.toISOString().split("T")[0]; }
+function isToday(dateStr) { return dateStr === toISO(new Date()); }
+function fmtTime(t) { return t || ""; }
+
+function AgendaView() {
+  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [meetings, setMeetings]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [expanded, setExpanded]   = useState(null);   // meeting id with comment section open
+  const [addingTo, setAddingTo]   = useState(null);   // date string for new meeting form
+  const [form, setForm]           = useState({ title: "", start_time: "", end_time: "" });
+  const [commentDraft, setCommentDraft] = useState({}); // meetingId → string
+  const formRef = useRef();
+  const commentRef = useRef();
+
+  const days = Array.from({ length: 7 }, (_, i) => shiftDays(weekStart, i));
+  const weekEnd = days[6];
+
+  useEffect(() => { loadWeek(); }, [weekStart]);
+  useEffect(() => { if (addingTo) setTimeout(() => formRef.current?.focus(), 40); }, [addingTo]);
+  useEffect(() => { if (expanded) setTimeout(() => commentRef.current?.focus(), 40); }, [expanded]);
+
+  async function loadWeek() {
+    setLoading(true);
+    try {
+      const { meetings: m } = await api.getMeetings({ from: toISO(weekStart), to: toISO(weekEnd) });
+      setMeetings(m);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }
+
+  const byDate = {};
+  days.forEach(d => { byDate[toISO(d)] = []; });
+  meetings.forEach(m => { if (byDate[m.date]) byDate[m.date].push(m); });
+
+  async function addMeeting(date) {
+    if (!form.title.trim()) { setAddingTo(null); return; }
+    try {
+      const { meeting } = await api.createMeeting({ title: form.title.trim(), date, start_time: form.start_time, end_time: form.end_time });
+      setMeetings(prev => [...prev, meeting].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")));
+    } catch (e) { console.error(e); }
+    setAddingTo(null); setForm({ title: "", start_time: "", end_time: "" });
+  }
+
+  async function deleteMeeting(id) {
+    setMeetings(prev => prev.filter(m => m.id !== id));
+    await api.deleteMeeting(id);
+  }
+
+  async function addComment(meeting) {
+    const text = (commentDraft[meeting.id] || "").trim();
+    if (!text) return;
+    const newComment = { id: Date.now().toString(), text, created_at: new Date().toISOString() };
+    const updatedComments = [...(meeting.comments || []), newComment];
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, comments: updatedComments } : m));
+    setCommentDraft(prev => ({ ...prev, [meeting.id]: "" }));
+    await api.updateMeeting(meeting.id, { comments: updatedComments });
+  }
+
+  async function deleteComment(meeting, commentId) {
+    const updatedComments = meeting.comments.filter(c => c.id !== commentId);
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, comments: updatedComments } : m));
+    await api.updateMeeting(meeting.id, { comments: updatedComments });
+  }
+
+  // Format week range label
+  const startM = weekStart.getMonth(), endM = weekEnd.getMonth();
+  const weekLabel = startM === endM
+    ? `${weekStart.getDate()}–${weekEnd.getDate()} ${MONTH_LABELS[startM]} ${weekStart.getFullYear()}`
+    : `${weekStart.getDate()} ${MONTH_LABELS[startM]} – ${weekEnd.getDate()} ${MONTH_LABELS[endM]} ${weekEnd.getFullYear()}`;
+
+  const navBtn = (label, onClick) => (
+    <button onClick={onClick} style={{
+      background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+      borderRadius: 8, padding: "6px 12px", fontSize: 14, color: "rgba(255,255,255,0.6)",
+      cursor: "pointer", transition: "all 0.15s",
+    }}
+      onMouseEnter={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.1)"; ev.currentTarget.style.color = "white"; }}
+      onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.06)"; ev.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
+    >{label}</button>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+
+      {/* ── Week navigation ── */}
+      <div style={{ padding: "20px 24px 14px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {navBtn("←", () => setWeekStart(d => shiftDays(d, -7)))}
+          <div style={{ flex: 1, textAlign: "center" }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", fontFamily: "var(--font-serif)", letterSpacing: "-0.01em" }}>
+              {weekLabel}
+            </span>
+          </div>
+          {navBtn("→", () => setWeekStart(d => shiftDays(d, 7)))}
+          <button onClick={() => setWeekStart(getMonday(new Date()))} style={{
+            background: "rgba(232,96,44,0.15)", border: "1px solid rgba(232,96,44,0.3)",
+            borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600,
+            color: "#f0956a", cursor: "pointer",
+          }}>Hoje</button>
+        </div>
+      </div>
+
+      {/* ── Day columns ── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 24px" }}>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 60, color: "rgba(255,255,255,0.25)", fontSize: 14 }}>Carregando…</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, minWidth: 700 }}>
+            {days.map(day => {
+              const dateStr = toISO(day);
+              const isNow = isToday(dateStr);
+              const dayMeetings = byDate[dateStr] || [];
+              const allComments = dayMeetings.flatMap(m =>
+                (m.comments || []).map(c => ({ text: c.text, meeting: m.title }))
+              );
+
+              return (
+                <div key={dateStr} style={{
+                  background: isNow ? "rgba(232,96,44,0.04)" : "#252525",
+                  border: `1px solid ${isNow ? "rgba(232,96,44,0.35)" : "rgba(255,255,255,0.07)"}`,
+                  borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden",
+                  minHeight: 200,
+                }}>
+
+                  {/* Day header */}
+                  <div style={{
+                    padding: "10px 12px 8px",
+                    borderBottom: `1px solid ${isNow ? "rgba(232,96,44,0.2)" : "rgba(255,255,255,0.06)"}`,
+                    background: isNow ? "rgba(232,96,44,0.08)" : "rgba(255,255,255,0.02)",
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: isNow ? "#f0956a" : "rgba(255,255,255,0.35)", marginBottom: 1 }}>
+                      {DAY_LABELS[day.getDay()]}
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: isNow ? "#f0956a" : "rgba(255,255,255,0.75)", lineHeight: 1.1, fontFamily: "var(--font-serif)" }}>
+                      {day.getDate()}
+                    </div>
+                  </div>
+
+                  {/* Day summary (comments) */}
+                  {allComments.length > 0 && (
+                    <div style={{ padding: "8px 10px 6px", background: "rgba(232,96,44,0.06)", borderBottom: "1px solid rgba(232,96,44,0.12)" }}>
+                      {allComments.slice(0, 3).map((c, i) => (
+                        <div key={i} style={{ display: "flex", gap: 5, alignItems: "flex-start", marginBottom: i < allComments.length - 1 ? 4 : 0 }}>
+                          <span style={{ fontSize: 8, color: "#E8602C", marginTop: 3, flexShrink: 0 }}>◆</span>
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>{c.text}</span>
+                        </div>
+                      ))}
+                      {allComments.length > 3 && (
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>+{allComments.length - 3} comentário{allComments.length - 3 > 1 ? "s" : ""}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Meetings list */}
+                  <div style={{ flex: 1, padding: "6px 0", overflowY: "auto" }}>
+                    {dayMeetings
+                      .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
+                      .map(meeting => {
+                        const isExp = expanded === meeting.id;
+                        const hasComments = meeting.comments?.length > 0;
+                        return (
+                          <div key={meeting.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", lastChild: { borderBottom: "none" } }}>
+                            {/* Meeting row */}
+                            <div
+                              onClick={() => setExpanded(isExp ? null : meeting.id)}
+                              style={{ padding: "7px 10px", cursor: "pointer", transition: "background 0.1s" }}
+                              onMouseEnter={ev => ev.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                              onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+                            >
+                              {(meeting.startTime || meeting.endTime) && (
+                                <div style={{ fontSize: 9, fontWeight: 700, color: isNow ? "#f0956a" : "rgba(255,255,255,0.3)", letterSpacing: "0.04em", marginBottom: 2 }}>
+                                  {fmtTime(meeting.startTime)}{meeting.endTime ? `–${fmtTime(meeting.endTime)}` : ""}
+                                </div>
+                              )}
+                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.82)", flex: 1, lineHeight: 1.3 }}>{meeting.title}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                                  {hasComments && (
+                                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.07)", borderRadius: 4, padding: "1px 5px" }}>
+                                      💬 {meeting.comments.length}
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={e => { e.stopPropagation(); deleteMeeting(meeting.id); }}
+                                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: "rgba(255,100,100,0.4)", padding: "0 2px", opacity: 0, transition: "opacity 0.15s" }}
+                                    onMouseEnter={ev => ev.currentTarget.style.opacity = "1"}
+                                    onMouseLeave={ev => ev.currentTarget.style.opacity = "0"}
+                                  >✕</button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Expanded comment section */}
+                            {isExp && (
+                              <div style={{ padding: "0 10px 10px", background: "rgba(0,0,0,0.2)" }}>
+                                {/* Existing comments */}
+                                {meeting.comments?.length > 0 && (
+                                  <div style={{ marginBottom: 8, paddingTop: 4 }}>
+                                    {meeting.comments.map(c => (
+                                      <div key={c.id} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", group: true }}
+                                        onMouseEnter={ev => ev.currentTarget.querySelector(".del-c").style.opacity = "1"}
+                                        onMouseLeave={ev => ev.currentTarget.querySelector(".del-c").style.opacity = "0"}
+                                      >
+                                        <span style={{ fontSize: 7, color: "#E8602C", marginTop: 4, flexShrink: 0 }}>●</span>
+                                        <span style={{ flex: 1, fontSize: 11, color: "rgba(255,255,255,0.65)", lineHeight: 1.4 }}>{c.text}</span>
+                                        <button className="del-c" onClick={() => deleteComment(meeting, c.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: "rgba(255,100,100,0.5)", padding: 0, opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>✕</button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {/* Add comment */}
+                                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                                  <input
+                                    ref={expanded === meeting.id ? commentRef : undefined}
+                                    value={commentDraft[meeting.id] || ""}
+                                    onChange={e => setCommentDraft(prev => ({ ...prev, [meeting.id]: e.target.value }))}
+                                    placeholder="Adicionar comentário…"
+                                    onKeyDown={e => { if (e.key === "Enter") addComment(meeting); }}
+                                    style={{
+                                      flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                      borderRadius: 8, padding: "5px 9px", fontSize: 11,
+                                      color: "rgba(255,255,255,0.85)", outline: "none",
+                                    }}
+                                    onFocus={ev => ev.currentTarget.style.borderColor = "#E8602C"}
+                                    onBlur={ev => ev.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"}
+                                  />
+                                  <button onClick={() => addComment(meeting)} style={{
+                                    background: (commentDraft[meeting.id] || "").trim() ? "#E8602C" : "rgba(255,255,255,0.08)",
+                                    border: "none", borderRadius: 8, padding: "5px 10px",
+                                    fontSize: 11, fontWeight: 700,
+                                    color: (commentDraft[meeting.id] || "").trim() ? "white" : "rgba(255,255,255,0.3)",
+                                    cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
+                                  }}>↑</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                    {/* Add meeting form inline */}
+                    {addingTo === dateStr ? (
+                      <div style={{ padding: "8px 10px", borderTop: dayMeetings.length ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                        <input
+                          ref={formRef}
+                          value={form.title}
+                          onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                          placeholder="Título da reunião…"
+                          onKeyDown={e => { if (e.key === "Enter") addMeeting(dateStr); if (e.key === "Escape") { setAddingTo(null); } }}
+                          style={{ width: "100%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(232,96,44,0.4)", borderRadius: 8, padding: "5px 9px", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.9)", outline: "none", marginBottom: 5, boxSizing: "border-box" }}
+                        />
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <input value={form.start_time} onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))} type="time"
+                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 6px", fontSize: 10, color: "rgba(255,255,255,0.7)", outline: "none", colorScheme: "dark" }}
+                          />
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", alignSelf: "center" }}>–</span>
+                          <input value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} type="time"
+                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 6px", fontSize: 10, color: "rgba(255,255,255,0.7)", outline: "none", colorScheme: "dark" }}
+                          />
+                        </div>
+                        <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
+                          <button onClick={() => addMeeting(dateStr)} style={{ flex: 1, background: "#E8602C", border: "none", borderRadius: 7, padding: "5px 0", fontSize: 10, fontWeight: 700, color: "white", cursor: "pointer" }}>Salvar</button>
+                          <button onClick={() => setAddingTo(null)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", fontSize: 10, color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setAddingTo(dateStr); setForm({ title: "", start_time: "", end_time: "" }); }}
+                        style={{ width: "100%", background: "none", border: "none", padding: "8px 10px", fontSize: 11, color: "rgba(255,255,255,0.18)", cursor: "pointer", textAlign: "left", transition: "color 0.15s" }}
+                        onMouseEnter={ev => ev.currentTarget.style.color = "rgba(255,255,255,0.5)"}
+                        onMouseLeave={ev => ev.currentTarget.style.color = "rgba(255,255,255,0.18)"}
+                      >+ reunião</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Home Page (Claude-style) ────────────────────────────────
 function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
   const [lastCreated, setLastCreated] = useState(null);
@@ -747,6 +1423,7 @@ function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
 // ─── Main App ────────────────────────────────────────────────
 export default function App() {
   const [showHome, setShowHome]           = useState(true);
+  const [activeView, setActiveView]       = useState("entries"); // "entries" | "projects" | "agenda"
   const [entries, setEntries]             = useState([]);
   const [filter, setFilter]               = useState("all");
   const [showLangMenu, setShowLangMenu]   = useState(false);
@@ -921,6 +1598,29 @@ export default function App() {
             )}
           </div>
 
+          {/* Views nav */}
+          <div style={{ padding: "8px 12px 6px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", flexDirection: "column", gap: 3 }}>
+            {[
+              { key: "projects", icon: "◫", label: "Projetos" },
+              { key: "agenda",   icon: "▦", label: "Agenda"   },
+            ].map(({ key, icon, label }) => (
+              <button key={key} onClick={() => setActiveView(v => v === key ? "entries" : key)} style={{
+                width: "100%", textAlign: "left",
+                background: activeView === key ? "rgba(232,96,44,0.15)" : "transparent",
+                border: activeView === key ? "1px solid rgba(232,96,44,0.25)" : "1px solid transparent",
+                borderRadius: 10, padding: "8px 12px",
+                display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                color: activeView === key ? "#f0956a" : "rgba(255,255,255,0.4)",
+                fontSize: 12, fontWeight: 600, transition: "all 0.15s",
+              }}
+                onMouseEnter={ev => { if (activeView !== key) { ev.currentTarget.style.background = "rgba(255,255,255,0.05)"; ev.currentTarget.style.color = "rgba(255,255,255,0.7)"; } }}
+                onMouseLeave={ev => { if (activeView !== key) { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.color = "rgba(255,255,255,0.4)"; } }}
+              >
+                <span style={{ fontSize: 13 }}>{icon}</span> {label}
+              </button>
+            ))}
+          </div>
+
           {/* Entry list */}
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
             {loading && (
@@ -963,7 +1663,7 @@ export default function App() {
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}><LogoIcon size={11} /></div>
               <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", letterSpacing: "-0.01em" }}>
-                Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>workspace</span>
+                Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{{ projects: "projetos", agenda: "agenda" }[activeView] || "workspace"}</span>
               </span>
             </div>
 
@@ -1029,13 +1729,19 @@ export default function App() {
           {/* Content */}
           <div style={{ flex: 1, overflowY: "auto" }}>
 
+            {/* Projects view */}
+            {activeView === "projects" && <ProjectsView />}
+
+            {/* Agenda view */}
+            {activeView === "agenda" && <AgendaView />}
+
             {/* Cards view */}
-            {showCards && (
+            {activeView === "entries" && showCards && (
               <CardsView entries={entries} onOpen={openEntry} />
             )}
 
             {/* Empty state */}
-            {!showCards && !activeEntry && (
+            {activeView === "entries" && !showCards && !activeEntry && (
               <div style={{
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 height: "100%", gap: 16, padding: 40,
@@ -1062,7 +1768,7 @@ export default function App() {
             )}
 
             {/* Entry view */}
-            {!showCards && activeEntry && !editing && (
+            {activeView === "entries" && !showCards && activeEntry && !editing && (
               <EntryView
                 entry={activeEntry}
                 related={activeRelated}
@@ -1074,13 +1780,13 @@ export default function App() {
             )}
 
             {/* Edit form */}
-            {!showCards && activeEntry && editing && (
+            {activeView === "entries" && !showCards && activeEntry && editing && (
               <EditForm entry={activeEntry} onSave={handleUpdate} onCancel={() => setEditing(false)} />
             )}
           </div>
 
           {/* Input */}
-          {!showCards && <InputBar onCreated={handleCreated} />}
+          {activeView === "entries" && !showCards && <InputBar onCreated={handleCreated} />}
         </div>
       )}
 
