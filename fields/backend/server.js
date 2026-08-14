@@ -78,7 +78,9 @@ async function initDB() {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     ALTER TABLE meetings ADD COLUMN IF NOT EXISTS must TEXT NOT NULL DEFAULT '';
-    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments      JSONB NOT NULL DEFAULT '[]';
+    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS kanban_status TEXT  NOT NULL DEFAULT 'A fazer';
+    ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date    TEXT;
   `);
 
   // Seed if empty
@@ -119,7 +121,7 @@ function toFrente(r) {
   return { id: r.id, projectId: r.project_id, name: r.name };
 }
 function toTask(r) {
-  return { id: r.id, frenteId: r.frente_id, name: r.name, acao: r.acao, status: r.status, stakeholder: r.stakeholder, deadline: r.deadline, holder: r.holder, comments: r.comments ?? [] };
+  return { id: r.id, frenteId: r.frente_id, name: r.name, acao: r.acao, status: r.status, stakeholder: r.stakeholder, deadline: r.deadline, holder: r.holder, comments: r.comments ?? [], kanbanStatus: r.kanban_status ?? "A fazer", startDate: r.start_date ?? null };
 }
 function toEntry(row) {
   return {
@@ -381,7 +383,7 @@ app.post("/api/frentes/:frenteId/tasks", async (req, res) => {
 // PATCH /api/tasks/:id
 app.patch("/api/tasks/:id", async (req, res) => {
   try {
-    const allowed = ["name", "acao", "status", "stakeholder", "deadline", "holder", "sort_order", "comments"];
+    const allowed = ["name", "acao", "status", "stakeholder", "deadline", "holder", "sort_order", "comments", "kanban_status", "start_date"];
     const sets = []; const params = [];
     allowed.forEach(f => { if (req.body[f] !== undefined) { params.push(req.body[f]); sets.push(`${f} = $${params.length}`); } });
     if (!sets.length) return res.status(400).json({ error: "nothing to update" });

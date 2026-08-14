@@ -868,6 +868,235 @@ function InputBar({ onCreated, bordered = false }) {
 }
 
 // ─── Projects View ───────────────────────────────────────────
+// ─── Kanban ──────────────────────────────────────────────────
+const KANBAN_COLS = [
+  { id: "A fazer", color: "rgba(255,255,255,0.35)", bg: "rgba(255,255,255,0.02)" },
+  { id: "Fazendo", color: "#E8602C",                bg: "rgba(232,96,44,0.04)"  },
+  { id: "Espera",  color: "#d97706",                bg: "rgba(217,119,6,0.04)"  },
+  { id: "Feito",   color: "#10b981",                bg: "rgba(16,185,129,0.04)" },
+];
+
+function KanbanCard({ task, colColor, onDragStart, onDragEnd, onMove, onSaveField }) {
+  const [exp, setExp] = useState(false);
+  const isDone = (task.kanbanStatus || "A fazer") === "Feito";
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      style={{
+        background: "#252525", borderRadius: 12, padding: "12px 14px",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderLeft: `3px solid ${colColor}`,
+        cursor: "grab", userSelect: "none",
+        opacity: isDone ? 0.6 : 1, transition: "box-shadow 0.15s",
+      }}
+      onMouseEnter={ev => ev.currentTarget.style.boxShadow = "0 6px 24px rgba(0,0,0,0.5)"}
+      onMouseLeave={ev => ev.currentTarget.style.boxShadow = "none"}
+    >
+      {/* Name */}
+      <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.88)", lineHeight: 1.4, marginBottom: 8, textDecoration: isDone ? "line-through" : "none" }}>
+        {task.name || "—"}
+      </div>
+
+      {/* Chips */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+        {task.frenteName && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.06)", borderRadius: 4, padding: "2px 6px" }}>{task.frenteName}</span>}
+        {task.stakeholder && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.06)", borderRadius: 4, padding: "2px 6px" }}>👤 {task.stakeholder}</span>}
+        {task.comments?.length > 0 && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.06)", borderRadius: 4, padding: "2px 6px" }}>💬 {task.comments.length}</span>}
+      </div>
+
+      {/* Dates preview (compact, always visible) */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+        {task.startDate && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>▶ {task.startDate}</span>}
+        {task.deadline  && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>⬛ {task.deadline}</span>}
+      </div>
+
+      {/* Expand toggle */}
+      <button onClick={() => setExp(v => !v)} style={{
+        background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left",
+        fontSize: 10, color: "rgba(255,255,255,0.2)", padding: "2px 0",
+        display: "flex", alignItems: "center", gap: 3,
+      }}>
+        <span style={{ display: "inline-block", transition: "transform 0.15s", transform: exp ? "rotate(90deg)" : "none" }}>▶</span>
+        {exp ? "Fechar" : "Datas / mover"}
+      </button>
+
+      {exp && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Date pickers */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Início</div>
+              <input type="date" colorScheme="dark"
+                defaultValue={task.startDate || ""}
+                onBlur={e => { if (e.target.value !== (task.startDate || "")) onSaveField("start_date", e.target.value || null); }}
+                style={{ width: "100%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 8px", fontSize: 11, color: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Fim</div>
+              <input type="date"
+                defaultValue={task.deadline || ""}
+                onBlur={e => { if (e.target.value !== (task.deadline || "")) onSaveField("deadline", e.target.value || null); }}
+                style={{ width: "100%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 8px", fontSize: 11, color: "rgba(255,255,255,0.7)", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
+              />
+            </div>
+          </div>
+          {/* Move buttons */}
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Mover para</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {KANBAN_COLS.filter(c => c.id !== (task.kanbanStatus || "A fazer")).map(c => (
+                <button key={c.id} onClick={() => { onMove(c.id); setExp(false); }} style={{
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "var(--r-full)", padding: "3px 10px",
+                  fontSize: 10, fontWeight: 700, color: c.color, cursor: "pointer",
+                }}
+                  onMouseEnter={ev => { ev.currentTarget.style.background = `${c.color}22`; ev.currentTarget.style.borderColor = `${c.color}55`; }}
+                  onMouseLeave={ev => { ev.currentTarget.style.background = "rgba(255,255,255,0.06)"; ev.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                >{c.id}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KanbanView() {
+  const [projects, setProjects] = useState([]);
+  const [selProjId, setSelProjId] = useState("");
+  const [selFrenteId, setSelFrenteId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [dragOver, setDragOver] = useState(null);
+  const dragId = useRef(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { projects: p } = await api.getProjects();
+      setProjects(p);
+      if (p.length > 0) setSelProjId(p[0].id);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }
+
+  const selProj   = projects.find(p => p.id === selProjId) || null;
+  const frentes   = selProj?.frentes || [];
+  const visFrentes = selFrenteId ? frentes.filter(f => f.id === selFrenteId) : frentes;
+  const allTasks  = visFrentes.flatMap(f => (f.tasks || []).map(t => ({ ...t, frenteName: f.name })));
+  const byCol     = Object.fromEntries(KANBAN_COLS.map(c => [c.id, allTasks.filter(t => (t.kanbanStatus || "A fazer") === c.id)]));
+
+  function patchTask(taskId, patch) {
+    setProjects(prev => prev.map(p => ({ ...p, frentes: p.frentes.map(f => ({ ...f, tasks: f.tasks.map(t => t.id === taskId ? { ...t, ...patch } : t) })) })));
+  }
+
+  async function moveTask(taskId, toCol) {
+    patchTask(taskId, { kanbanStatus: toCol });
+    await api.updateTask(taskId, { kanban_status: toCol });
+  }
+
+  async function saveField(taskId, field, value) {
+    const localKey = field === "start_date" ? "startDate" : field;
+    patchTask(taskId, { [localKey]: value });
+    await api.updateTask(taskId, { [field]: value });
+  }
+
+  function onDragStart(e, taskId) { dragId.current = taskId; e.dataTransfer.effectAllowed = "move"; }
+  function onDragOver(e, colId)   { e.preventDefault(); setDragOver(colId); }
+  function onDrop(e, colId)       { e.preventDefault(); if (dragId.current) moveTask(dragId.current, colId); dragId.current = null; setDragOver(null); }
+  function onDragEnd()            { dragId.current = null; setDragOver(null); }
+
+  if (loading) return <div style={{ padding: 40, color: "rgba(255,255,255,0.3)", fontSize: 13 }}>Carregando…</div>;
+
+  return (
+    <div style={{ padding: "28px 24px 16px", height: "100%", display: "flex", flexDirection: "column", gap: 20, boxSizing: "border-box", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexShrink: 0 }}>
+        <div>
+          <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 600, color: "rgba(255,255,255,0.92)", margin: 0, letterSpacing: "-0.02em" }}>Kanban</h2>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.28)", marginTop: 4 }}>Visão por etapa de execução</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select value={selProjId} onChange={e => { setSelProjId(e.target.value); setSelFrenteId(""); }} style={{
+            background: "#252525", border: "1px solid rgba(255,255,255,0.1)",
+            color: "rgba(255,255,255,0.85)", borderRadius: 10, padding: "8px 12px",
+            fontSize: 12, cursor: "pointer", outline: "none",
+          }}>
+            <option value="">— Projeto —</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {selProj && frentes.length > 1 && (
+            <select value={selFrenteId} onChange={e => setSelFrenteId(e.target.value)} style={{
+              background: "#252525", border: "1px solid rgba(255,255,255,0.1)",
+              color: "rgba(255,255,255,0.85)", borderRadius: 10, padding: "8px 12px",
+              fontSize: 12, cursor: "pointer", outline: "none",
+            }}>
+              <option value="">Todas as frentes</option>
+              {frentes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Board */}
+      {!selProj ? (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.18)", fontSize: 14 }}>
+          Selecione um projeto para visualizar o Kanban
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, overflowY: "auto", minHeight: 0 }}>
+          {KANBAN_COLS.map(col => (
+            <div key={col.id}
+              onDragOver={e => onDragOver(e, col.id)}
+              onDrop={e => onDrop(e, col.id)}
+              onDragLeave={() => setDragOver(null)}
+              style={{
+                background: dragOver === col.id ? "rgba(255,255,255,0.04)" : col.bg,
+                border: `1px solid ${dragOver === col.id ? col.color + "70" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 14, padding: "14px 12px",
+                display: "flex", flexDirection: "column", gap: 10,
+                transition: "all 0.15s", minHeight: 120,
+              }}
+            >
+              {/* Column header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: col.color, flexShrink: 0, display: "inline-block" }} />
+                  <span style={{ fontSize: 12, fontWeight: 800, color: col.color, letterSpacing: "0.02em" }}>{col.id}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.22)", fontWeight: 600, background: "rgba(255,255,255,0.06)", borderRadius: 20, padding: "1px 7px" }}>{byCol[col.id].length}</span>
+              </div>
+
+              {/* Cards */}
+              {byCol[col.id].map(task => (
+                <KanbanCard key={task.id} task={task} colColor={col.color}
+                  onDragStart={e => onDragStart(e, task.id)}
+                  onDragEnd={onDragEnd}
+                  onMove={toCol => moveTask(task.id, toCol)}
+                  onSaveField={(field, value) => saveField(task.id, field, value)}
+                />
+              ))}
+
+              {byCol[col.id].length === 0 && (
+                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.1)", fontSize: 12, fontStyle: "italic", minHeight: 60 }}>
+                  Vazio
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Projects constants ───────────────────────────────────────
 const PROJ_STATUS_LIST = ["Em andamento", "Pendente", "Marcado", "Em definição", "Não iniciado", "Concluído"];
 const PROJ_STATUS_COLOR = {
   "Em andamento": "#E8602C",
@@ -2065,6 +2294,7 @@ export default function App() {
             {[
               { key: "projects", icon: "◫", label: "Projetos" },
               { key: "agenda",   icon: "▦", label: "Agenda"   },
+              { key: "kanban",   icon: "◧", label: "Kanban"   },
             ].map(({ key, icon, label }) => (
               <button key={key} onClick={() => setActiveView(v => v === key ? "entries" : key)} style={{
                 width: "100%", textAlign: "left",
@@ -2125,7 +2355,7 @@ export default function App() {
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}><LogoIcon size={11} /></div>
               <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", letterSpacing: "-0.01em" }}>
-                Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{{ projects: "projetos", agenda: "agenda" }[activeView] || "workspace"}</span>
+                Fields' <span style={{ fontSize: 11, fontWeight: 400, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{{ projects: "projetos", agenda: "agenda", kanban: "kanban" }[activeView] || "workspace"}</span>
               </span>
             </div>
 
@@ -2195,7 +2425,8 @@ export default function App() {
             {activeView === "projects" && <ProjectsView />}
 
             {/* Agenda view */}
-            {activeView === "agenda" && <AgendaView />}
+            {activeView === "agenda"   && <AgendaView />}
+            {activeView === "kanban"   && <KanbanView />}
 
             {/* Cards view */}
             {activeView === "entries" && showCards && (
