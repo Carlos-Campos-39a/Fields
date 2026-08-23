@@ -1,0 +1,16 @@
+{
+  "name": "fields-mcp",
+  "version": "1.0.0",
+  "description": "MCP server para a plataforma Fields' — permite agentes de IA operar entradas, projetos, tasks, kanban e agenda",
+  "type": "module",
+  "bin": {
+    "fields-mcp": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  }
+}
