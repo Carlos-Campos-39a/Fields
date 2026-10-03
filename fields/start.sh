@@ -33,7 +33,7 @@ echo "  Ctrl+C para parar."
 echo ""
 
 # Roda ambos em paralelo
-cd "$ROOT/backend" && node server.js &
+cd "$ROOT/backend" && node --env-file=.env server.js &
 BACKEND_PID=$!
 
 cd "$ROOT/frontend" && npm run dev -- --open &

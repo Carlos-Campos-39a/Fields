@@ -6,11 +6,16 @@ Plataforma local para registro de **notas**, **reuniões** e **lembretes**.
 
 ## Requisitos
 
-- **Node.js** 18+ → [nodejs.org](https://nodejs.org)
+- **Node.js** 22+ → [nodejs.org](https://nodejs.org)
+- **Postgres** (local ou o do Railway)
 
 ---
 
 ## Início rápido
+
+A API exige login. Antes de subir, crie `backend/.env` a partir de `backend/.env.example`
+(as quatro variáveis obrigatórias estão explicadas lá; a senha vira hash com
+`node scripts/hash-senha.mjs`). Sem elas o servidor não sobe e diz quais faltam.
 
 ```bash
 # 1. Tornar o script executável (Mac/Linux)
@@ -25,7 +30,8 @@ chmod +x start.sh
 # Backend
 cd backend
 npm install
-node server.js
+npm run dev        # lê o .env
+npm test           # testes, sem Postgres
 
 # Frontend (novo terminal)
 cd frontend
