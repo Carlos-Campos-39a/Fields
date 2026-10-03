@@ -1,0 +1,268 @@
+/* Galeria de desenvolvimento (ui.html). Não entra no build de produção. */
+
+.pagina {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+}
+
+.topo {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text);
+}
+
+.marcaLogo {
+  color: var(--accent);
+}
+
+.marcaNome {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+
+.marcaSub {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.temas {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.temaAtivo {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.temaResolvido {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-5) 96px;
+}
+
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+}
+
+.nota {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  max-width: 720px;
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.legenda {
+  min-width: 96px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.pagina code,
+.codigo {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+/* ── Cores ──────────────────────────────────────────────────────────────── */
+.grade {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.1fr) 1fr 1fr;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
+}
+
+.cabecalho {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 6px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.amostra {
+  width: 28px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25);
+}
+
+.nomeToken {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text);
+}
+
+/* ── Tipografia, espaço, raio ───────────────────────────────────────────── */
+.tipo {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--sp-1) var(--sp-4);
+  align-items: baseline;
+}
+
+.serif {
+  font-family: var(--font-serif);
+}
+
+.barra {
+  height: 12px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.caixaRaio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 64px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+.caixaSombra {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 64px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+/* ── Ícones e logo ──────────────────────────────────────────────────────── */
+.icones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--sp-2);
+}
+
+.icone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.ladrilho {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 11px;
+  background: var(--accent);
+  color: #faf9f5;
+}
+
+.borda {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .topo {
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .conteudo {
+    padding: var(--sp-5) var(--sp-4) 96px;
+  }
+  .cartao {
+    padding: var(--sp-4);
+  }
+  .grade {
+    grid-template-columns: 1fr 1fr;
+  }
+  .grade > .nomeToken,
+  .grade > .cabecalhoNome {
+    grid-column: 1 / -1;
+    margin-top: var(--sp-2);
+  }
+  .tipo {
+    grid-template-columns: 1fr;
+  }
+}

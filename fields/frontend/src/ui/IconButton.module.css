@@ -1,0 +1,47 @@
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.botao:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.md {
+  width: 32px;
+  height: 32px;
+}
+
+.sm {
+  width: 28px;
+  height: 28px;
+}
+
+.secondary {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.ativo,
+.ativo:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}

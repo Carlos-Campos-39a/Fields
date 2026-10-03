@@ -1,0 +1,119 @@
+/*
+ * Base do Fields' (R1): reset, corpo, foco, movimento reduzido e rolagem.
+ *
+ * Compatibilidade com o App.jsx (monólito, até a R2):
+ *  - o reset zera margin/padding de tudo, como o index.css antigo — o App.jsx depende disso;
+ *  - o corpo NÃO fixa font-size nem line-height: trechos do App.jsx sem tamanho explícito herdam
+ *    os 16px do navegador. Os primitivos de src/ui/ declaram o próprio tamanho;
+ *  - @keyframes fadeUp continua global: o App.jsx a usa em style inline.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+textarea,
+input,
+select {
+  font-family: var(--font-ui);
+}
+
+/* ── Foco: visível só para teclado; o anel é o acento ─────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Utilitário: texto só para leitor de tela ─────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Rolagem ──────────────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+/* Firefox (sem ::-webkit-scrollbar). Fica fora do Chrome de propósito: lá, scrollbar-color
+   desligaria as regras acima. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+}
+
+/* ── Animação usada pelo App.jsx (style inline) ───────────────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Movimento reduzido ───────────────────────────────────────────────────────────────── */
+/* O !important vence o style inline do App.jsx. O Spinner reabre a própria exceção. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

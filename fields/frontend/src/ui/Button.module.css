@@ -1,0 +1,86 @@
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  user-select: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Carregando: não esmaece (o rótulo continua legível), só bloqueia o clique. */
+.carregando:disabled {
+  cursor: progress;
+  opacity: 1;
+}
+
+/* ── Tamanhos ───────────────────────────────────────────────────────────── */
+.md {
+  height: 36px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-base);
+}
+
+.sm {
+  height: 28px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  gap: 6px;
+}
+
+/* ── Variantes ──────────────────────────────────────────────────────────── */
+/* Primário = tinta invertida: fundo --text, texto --bg (17,5:1 claro; 15,8:1 escuro). */
+.primary {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+.primary:hover:not(:disabled) {
+  background: var(--primary-bg-hover);
+}
+
+.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.danger {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+.rotulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

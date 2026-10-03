@@ -1,0 +1,220 @@
+/*
+ * Tokens do Fields' (R1).
+ *
+ * Paleta e tipografia: as publicadas na skill brand-guidelines (repositório anthropics/skills) —
+ * só as cores e as fontes; nenhum logo, nome ou marca de terceiros entra na interface. O monograma
+ * F' continua sendo o do Fields'.
+ *
+ * Regras de uso (medidas, não decorativas):
+ *  - #d97757 (--accent) reprova como texto no claro (2,96:1). É preenchimento, ícone e foco.
+ *    Texto e link em laranja usam --accent-ink.
+ *  - O anel de foco é --accent-ink, não --accent: o laranja puro dá 2,96:1 sobre --bg, abaixo
+ *    dos 3:1 de componente não textual (WCAG 1.4.11). --accent-ink dá 4,7:1 no claro e é o
+ *    próprio #d97757 no escuro (4,9:1).
+ *  - #b0aea5 (--decorative) nunca é texto no claro.
+ *  - Preenchimento colorido (badge sólido) leva --on-fill (#141413) nos DOIS temas: branco sobre
+ *    #6a9bcc/#d97757/#788c5d fica abaixo de 3,2:1.
+ *  - As tintas (--*-ink) passam AA sobre --bg e --surface. Sobre --surface-2, accent-ink e
+ *    info-ink caem para 4,3–4,5:1: ali, texto é --text, --text-2 ou --text-3.
+ *  - Sombra só em sobreposição (popover, toast, diálogo): --shadow-popover. Cartão usa borda.
+ *
+ * Estrutura:
+ *  1. claro (padrão) em :root e em qualquer [data-theme="light"];
+ *  2. escuro em [data-theme="dark"], e pelo sistema quando o <html> não pediu claro;
+ *  3. derivados e nomes legados em ":root, [data-theme]", para que um subárvore com data-theme
+ *     próprio (a galeria compara os dois lados) recalcule os aliases com os valores dele.
+ */
+
+/* ── 1. Claro (padrão) + escalas que não mudam com o tema ───────────────────────────────── */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Superfícies */
+  --bg: #faf9f5;
+  --surface: #ffffff;
+  --surface-2: #f0eee6;
+  --border: #e8e6dc;
+  --border-strong: #d1cfc5;
+  --decorative: #b0aea5; /* nunca texto no claro */
+
+  /* Texto (contraste medido sobre --bg) */
+  --text: #141413; /* 17,5:1 */
+  --text-2: #5e5d59; /* 6,3:1 */
+  --text-3: #6b6a65; /* 5,1:1 */
+
+  /* Acento */
+  --accent: #d97757; /* preenchimento, ícone, foco */
+  --accent-ink: #b5532f; /* texto e link "Desfazer" — 4,7:1 */
+  --accent-soft: rgba(217, 119, 87, 0.14);
+
+  /* Estados: a cor de preenchimento e a "tinta" (versão que passa como texto) */
+  --on-fill: #141413;
+  --info: #6a9bcc;
+  --info-ink: #47709b; /* 4,9:1 */
+  --info-soft: rgba(106, 155, 204, 0.16);
+  --success: #788c5d;
+  --success-ink: #5d6f45; /* 5,2:1 */
+  --success-soft: rgba(120, 140, 93, 0.16);
+  --warning: #c8963e;
+  --warning-ink: #8a6116; /* 5,2:1 */
+  --warning-soft: rgba(200, 150, 62, 0.16);
+  --danger: #b5432f; /* 5,2:1 — já passa como texto */
+  --danger-hover: #9c3826;
+  --on-danger: #ffffff; /* 5,5:1 sobre --danger */
+  --danger-soft: rgba(181, 67, 47, 0.1);
+
+  /* Botão primário = tinta invertida */
+  --primary-bg-hover: #30302e;
+
+  /* Sobreposição */
+  --overlay: rgba(20, 20, 19, 0.32);
+  --shadow-popover: 0 1px 2px rgba(20, 20, 19, 0.06), 0 8px 24px rgba(20, 20, 19, 0.1);
+  --scrollbar-thumb: #d1cfc5;
+  --scrollbar-thumb-hover: #b0aea5;
+
+  /* Tipografia */
+  --font-ui: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-serif: "Lora", Georgia, "Times New Roman", serif; /* saudação, títulos, nota, agente */
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 28px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --lh-reading: 1.65;
+  --tracking-label: 0.06em;
+
+  /* Espaçamento */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* Raios */
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Movimento */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Camadas (o App.jsx usa até 9999 inline) */
+  --z-popover: 10000;
+  --z-toast: 10010;
+}
+
+/* ── 2. Escuro quente ───────────────────────────────────────────────────────────────────── */
+/* O bloco aparece duas vezes (explícito e pelo sistema): CSS não tem mixin. Mude os dois juntos. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #1f1e1d;
+  --surface: #262624;
+  --surface-2: #30302e;
+  --border: #3a3936;
+  --border-strong: #4d4c48;
+  --decorative: #5e5d59;
+
+  --text: #faf9f5; /* 15,8:1 */
+  --text-2: #b0aea5; /* 7,5:1 (6,8:1 sobre --surface) */
+  --text-3: #9c9a92; /* 5,9:1 (5,4:1 sobre --surface) */
+
+  --accent: #d97757;
+  --accent-ink: #d97757; /* 5,3:1 sobre --bg */
+  --accent-soft: rgba(217, 119, 87, 0.2);
+
+  --on-fill: #141413;
+  --info: #6a9bcc;
+  --info-ink: #6a9bcc; /* 5,7:1 */
+  --info-soft: rgba(106, 155, 204, 0.2);
+  --success: #788c5d;
+  --success-ink: #94a87a; /* 6,4:1 — #788c5d dá só 4,1:1 sobre --surface */
+  --success-soft: rgba(120, 140, 93, 0.24);
+  --warning: #c8963e;
+  --warning-ink: #d4a85a; /* 7,6:1 */
+  --warning-soft: rgba(200, 150, 62, 0.2);
+  --danger: #ec7a6e; /* 6,0:1 */
+  --danger-hover: #f08f84;
+  --on-danger: #141413; /* 6,6:1 sobre --danger */
+  --danger-soft: rgba(236, 122, 110, 0.16);
+
+  --primary-bg-hover: #e8e6dc;
+
+  --overlay: rgba(0, 0, 0, 0.56);
+  --shadow-popover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.48);
+  --scrollbar-thumb: #4d4c48;
+  --scrollbar-thumb-hover: #6b6a65;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #1f1e1d;
+    --surface: #262624;
+    --surface-2: #30302e;
+    --border: #3a3936;
+    --border-strong: #4d4c48;
+    --decorative: #5e5d59;
+
+    --text: #faf9f5;
+    --text-2: #b0aea5;
+    --text-3: #9c9a92;
+
+    --accent: #d97757;
+    --accent-ink: #d97757;
+    --accent-soft: rgba(217, 119, 87, 0.2);
+
+    --on-fill: #141413;
+    --info: #6a9bcc;
+    --info-ink: #6a9bcc;
+    --info-soft: rgba(106, 155, 204, 0.2);
+    --success: #788c5d;
+    --success-ink: #94a87a;
+    --success-soft: rgba(120, 140, 93, 0.24);
+    --warning: #c8963e;
+    --warning-ink: #d4a85a;
+    --warning-soft: rgba(200, 150, 62, 0.2);
+    --danger: #ec7a6e;
+    --danger-hover: #f08f84;
+    --on-danger: #141413;
+    --danger-soft: rgba(236, 122, 110, 0.16);
+
+    --primary-bg-hover: #e8e6dc;
+
+    --overlay: rgba(0, 0, 0, 0.56);
+    --shadow-popover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.48);
+    --scrollbar-thumb: #4d4c48;
+    --scrollbar-thumb-hover: #6b6a65;
+  }
+}
+
+/* ── 3. Derivados e legado ──────────────────────────────────────────────────────────────── */
+:root,
+[data-theme] {
+  --primary-bg: var(--text);
+  --primary-fg: var(--bg);
+  --focus-ring: var(--accent-ink);
+
+  /* Legado do App.jsx — somem quando a R2 quebrar o monólito. Não use em código novo. */
+  --text-main: var(--text);
+  --gray-200: var(--border);
+  --r-md: var(--radius-sm);
+  --r-lg: var(--radius-lg);
+  --r-full: var(--radius-pill);
+}
