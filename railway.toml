@@ -3,3 +3,7 @@ installCommand = "npm install"
 
 [deploy]
 startCommand = "node server.js"
+# O deploy novo só substitui o atual depois de responder 200 aqui. O servidor só abre a porta
+# depois do initDB (schema + migração de dado): um boot que quebra nunca derruba o que está no ar.
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60

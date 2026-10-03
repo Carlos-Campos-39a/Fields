@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Paridade entre o server.js monolítico (antigo) e o backend dividido (novo).
 //
-//   node scripts/paridade.mjs <BASE_ANTIGA> <BASE_NOVA> [--bearer TOKEN_NOVA]
+//   node scripts/paridade.mjs <BASE_ANTIGA> <BASE_NOVA> [--bearer TOKEN_NOVA] [--bearer-antiga TOKEN_ANTIGA]
 //   ex.: node scripts/paridade.mjs http://localhost:3001 http://localhost:3002 --bearer "$FIELDS_API_TOKEN"
 //
 // Cada servidor precisa de um banco PRÓPRIO e ZERADO (o seed de 5 entradas roda no primeiro boot).
@@ -19,7 +19,11 @@ import { pathToFileURL } from "node:url";
 
 const SEED_HOJE = "Arquitetura de Agentes LLM";
 const MUST = "levar os números do trimestre";
-const COMENTARIOS = [{ id: "c1", text: "comentário de paridade", createdAt: "2030-01-01T12:00:00.000Z" }];
+// O formato que os clientes reais mandam: id próprio por item (o front usa Date.now()/uuid) e
+// created_at em tarefas e reuniões. Um id repetido entre tarefa e reunião é colisão global — a A1
+// guarda o segundo com id de alias, de propósito —, e não um caso de paridade.
+const COMENTARIOS_TAREFA = [{ id: "c-tarefa-1", text: "comentário de paridade", created_at: "2030-01-01T12:00:00.000Z" }];
+const COMENTARIOS_REUNIAO = [{ id: "c-reuniao-1", text: "comentário de paridade", created_at: "2030-01-01T12:00:00.000Z" }];
 const ID_INEXISTENTE = "00000000-0000-4000-8000-000000000000";
 
 // ─── Divergências DECLARADAS: o que mudou de propósito na A0 ───
@@ -34,10 +38,14 @@ export const DIVERGENCIAS_ESPERADAS = {
       && a.json?.meeting?.must === "" && n.json?.meeting?.must === MUST
       && iguais({ ...a.json.meeting, must: MUST }, n.json.meeting),
   },
+  // A mesma chamada mudou duas vezes, e o harness compara as duas trocas: monolítico → A0 e A0 → A1.
   "frente-em-projeto-inexistente": {
-    motivo: "(c) corpo do 500: a antiga ecoava a mensagem do pg; a nova devolve {error:\"erro_interno\"}",
-    confere: (a, n) => a.status === 500 && n.status === 500
-      && typeof a.json?.error === "string" && iguais(n.json, { error: "erro_interno" }),
+    motivo: "(c) projeto inexistente: monolítico → A0, o corpo do 500 deixa de ecoar a mensagem do pg ({error:\"erro_interno\"}); "
+      + "A0 → A1, vira 404 {error:\"Not found\"} (o serviço confere o pai antes do INSERT, em vez de estourar na FK)",
+    confere: (a, n) => (a.status === 500 && n.status === 500
+      && typeof a.json?.error === "string" && iguais(n.json, { error: "erro_interno" }))
+      || (a.status === 500 && iguais(a.json, { error: "erro_interno" })
+        && n.status === 404 && iguais(n.json, { error: "Not found" })),
   },
 };
 
@@ -83,12 +91,12 @@ export const PASSOS = [
   { nome: "frente-editar", metodo: "PATCH", caminho: (c) => `/api/frentes/${c.frente}`, corpo: () => ({ name: "Frente renomeada" }) },
   // A árvore é lida ANTES do comentário: depois dele, os dois servidores divergem de propósito (a).
   { nome: "projetos-arvore", metodo: "GET", caminho: () => "/api/projects" },
-  { nome: "tarefa-comentarios", metodo: "PATCH", caminho: (c) => `/api/tasks/${c.tarefa}`, corpo: () => ({ comments: COMENTARIOS }) },
+  { nome: "tarefa-comentarios", metodo: "PATCH", caminho: (c) => `/api/tasks/${c.tarefa}`, corpo: () => ({ comments: COMENTARIOS_TAREFA }) },
   { nome: "reuniao-criar-com-must", metodo: "POST", caminho: () => "/api/meetings",
     corpo: () => ({ title: "Reunião paridade", date: "2030-03-04", start_time: "10:00", end_time: "11:00", description: "pauta", must: MUST }),
     depois: (c, j) => { c.reuniao = j?.meeting?.id; } },
   { nome: "reuniao-sem-data-400", metodo: "POST", caminho: () => "/api/meetings", corpo: () => ({ title: "sem data" }) },
-  { nome: "reuniao-editar", metodo: "PATCH", caminho: (c) => `/api/meetings/${c.reuniao}`, corpo: () => ({ comments: COMENTARIOS, must: "must editado" }) },
+  { nome: "reuniao-editar", metodo: "PATCH", caminho: (c) => `/api/meetings/${c.reuniao}`, corpo: () => ({ comments: COMENTARIOS_REUNIAO, must: "must editado" }) },
   { nome: "reuniao-inexistente-404", metodo: "PATCH", caminho: () => `/api/meetings/${ID_INEXISTENTE}`, corpo: () => ({ title: "x" }) },
   { nome: "reunioes-intervalo", metodo: "GET", caminho: () => "/api/meetings?from=2030-03-01&to=2030-03-31" },
   { nome: "reunioes-desde", metodo: "GET", caminho: () => "/api/meetings?from=2030-03-01" },
@@ -183,27 +191,29 @@ async function chamar(srv, passo) {
 }
 
 function argumentos(argv) {
-  const pos = []; let bearer = process.env.FIELDS_API_TOKEN;
+  const pos = []; let bearer = process.env.FIELDS_API_TOKEN; let bearerAntiga = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--bearer") bearer = argv[++i];
+    else if (argv[i] === "--bearer-antiga") bearerAntiga = argv[++i];
     else pos.push(argv[i]);
   }
-  return { pos, bearer };
+  return { pos, bearer, bearerAntiga };
 }
 
 const baseDe = (url) => url.replace(/\/+$/, "").replace(/\/api$/, "");
 
 async function main() {
-  const { pos, bearer } = argumentos(process.argv.slice(2));
+  const { pos, bearer, bearerAntiga } = argumentos(process.argv.slice(2));
   if (pos.length !== 2) {
-    console.error("uso: node scripts/paridade.mjs <BASE_ANTIGA> <BASE_NOVA> [--bearer TOKEN_NOVA]");
+    console.error("uso: node scripts/paridade.mjs <BASE_ANTIGA> <BASE_NOVA> [--bearer TOKEN_NOVA] [--bearer-antiga TOKEN_ANTIGA]");
     process.exit(2);
   }
   if (!bearer) {
     console.error("falta o token do servidor novo: --bearer TOKEN ou FIELDS_API_TOKEN no ambiente");
     process.exit(2);
   }
-  const antiga = { nome: "antiga", base: baseDe(pos[0]), headers: {}, ctx: { ids: new Map(), hoje: null } };
+  // A antiga só recebe Bearer quando ela também exige (A0 em diante): --bearer-antiga.
+  const antiga = { nome: "antiga", base: baseDe(pos[0]), headers: bearerAntiga ? { Authorization: `Bearer ${bearerAntiga}` } : {}, ctx: { ids: new Map(), hoje: null } };
   const nova = { nome: "nova", base: baseDe(pos[1]), headers: { Authorization: `Bearer ${bearer}` }, ctx: { ids: new Map(), hoje: null } };
 
   const linhas = [];
