@@ -1,0 +1,116 @@
+/*
+ * Cada tom define sete variáveis locais; cada variante escolhe quais usa.
+ *   --b-fill      preenchimento (variante solid)
+ *   --b-on-fill   texto sobre o preenchimento
+ *   --b-soft      fundo da variante soft
+ *   --b-soft-text texto da soft
+ *   --b-line      anel da outline
+ *   --b-line-text texto da outline
+ *   --b-dot       cor do ponto
+ * O texto das variantes soft e outline é --text (ou --text-2/--text-3 no neutro), nunca a cor do
+ * tom: as tintas coloridas caem abaixo de 4,5:1 sobre fundo tingido ou sobre --surface-2.
+ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ponto {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--b-dot);
+  flex-shrink: 0;
+}
+
+/* ── Tons ───────────────────────────────────────────────────────────────── */
+.neutral {
+  --b-fill: var(--text-2);
+  --b-on-fill: var(--bg);
+  --b-soft: var(--surface-2);
+  --b-soft-text: var(--text-2);
+  --b-line: var(--border-strong);
+  --b-line-text: var(--text-3);
+  --b-dot: var(--decorative);
+}
+
+.info {
+  --b-fill: var(--info);
+  --b-on-fill: var(--on-fill);
+  --b-soft: var(--info-soft);
+  --b-soft-text: var(--text);
+  --b-line: var(--info);
+  --b-line-text: var(--text);
+  --b-dot: var(--info);
+}
+
+.success {
+  --b-fill: var(--success);
+  --b-on-fill: var(--on-fill);
+  --b-soft: var(--success-soft);
+  --b-soft-text: var(--text);
+  --b-line: var(--success);
+  --b-line-text: var(--text);
+  --b-dot: var(--success);
+}
+
+.warning {
+  --b-fill: var(--warning);
+  --b-on-fill: var(--on-fill);
+  --b-soft: var(--warning-soft);
+  --b-soft-text: var(--text);
+  --b-line: var(--warning);
+  --b-line-text: var(--text);
+  --b-dot: var(--warning);
+}
+
+.accent {
+  --b-fill: var(--accent);
+  --b-on-fill: var(--on-fill);
+  --b-soft: var(--accent-soft);
+  --b-soft-text: var(--text);
+  --b-line: var(--accent);
+  --b-line-text: var(--text);
+  --b-dot: var(--accent);
+}
+
+.danger {
+  --b-fill: var(--danger);
+  --b-on-fill: var(--on-danger);
+  --b-soft: var(--danger-soft);
+  --b-soft-text: var(--text);
+  --b-line: var(--danger);
+  --b-line-text: var(--text);
+  --b-dot: var(--danger);
+}
+
+/* ── Variantes ──────────────────────────────────────────────────────────── */
+.soft {
+  background: var(--b-soft);
+  color: var(--b-soft-text);
+}
+
+.solid {
+  background: var(--b-fill);
+  color: var(--b-on-fill);
+}
+
+.solid .ponto {
+  background: currentColor;
+}
+
+.outline {
+  background: transparent;
+  color: var(--b-line-text);
+  box-shadow: inset 0 0 0 1px var(--b-line);
+}

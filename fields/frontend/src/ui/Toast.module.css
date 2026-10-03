@@ -1,0 +1,95 @@
+/* Região fixa no rodapé, centralizada. Fica montada sempre: é a live region que anuncia. */
+.regiao {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-5);
+  z-index: var(--z-toast);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--sp-4));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 44px;
+  max-width: 480px;
+  padding: 6px 6px 6px var(--sp-4);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: var(--lh-tight);
+  pointer-events: auto;
+  animation: subir var(--dur-base) var(--ease-out);
+}
+
+@keyframes subir {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.icone {
+  flex-shrink: 0;
+}
+
+.success .icone {
+  color: var(--success);
+}
+
+.danger .icone {
+  color: var(--danger);
+}
+
+.mensagem {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+}
+
+/* Ação ("Desfazer"): link em --accent-ink — 4,95:1 sobre --surface no claro. */
+.acao {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
+/* Hover sublinha em vez de tingir: sobre fundo tingido a tinta cairia abaixo de 4,5:1. */
+.acao:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .regiao {
+    bottom: var(--sp-4);
+    width: calc(100vw - 2 * var(--sp-4));
+  }
+  .toast {
+    width: 100%;
+    max-width: none;
+  }
+}

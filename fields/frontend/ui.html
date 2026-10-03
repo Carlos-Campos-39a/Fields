@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
+    <!--
+      Galeria de desenvolvimento dos tokens e primitivos (R1): http://localhost:5173/ui.html.
+      O Vite serve qualquer .html da raiz em dev; o build só empacota o index.html, então esta
+      página não vai para produção.
+    -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>Fields'</title>
+    <meta name="robots" content="noindex" />
+    <title>Fields' — galeria de UI</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!--
-      Tema antes da primeira pintura. Mesma regra de src/theme/theme.js (mude os dois juntos):
-      preferência em localStorage "fields.tema" = light | dark | system; sem preferência, claro.
-    -->
+    <!-- Mesmo script de tema do index.html (e mesma regra de src/theme/theme.js). -->
     <script>
       (function () {
         var raiz = document.documentElement;
@@ -18,7 +21,7 @@
           var salva = window.localStorage.getItem("fields.tema");
           if (salva === "light" || salva === "dark" || salva === "system") preferencia = salva;
         } catch (e) {
-          /* storage bloqueado (aba privada, política do navegador): segue no padrão */
+          /* storage bloqueado: segue no padrão */
         }
         var tema = preferencia;
         if (preferencia === "system") {
@@ -41,7 +44,7 @@
     />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div id="galeria"></div>
+    <script type="module" src="/src/ui/galeria-main.jsx"></script>
   </body>
 </html>

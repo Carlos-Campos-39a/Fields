@@ -1,0 +1,65 @@
+.dialogo {
+  width: min(420px, calc(100vw - 2 * var(--sp-4)));
+  max-height: calc(100vh - 2 * var(--sp-4));
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-popover);
+  font-family: var(--font-ui);
+}
+
+.dialogo[open] {
+  animation: surgir var(--dur-base) var(--ease-out);
+}
+
+/* ::backdrop só herda custom properties nos navegadores de 2024 em diante: daí o fallback. */
+.dialogo::backdrop {
+  background: var(--overlay, rgba(20, 20, 19, 0.32));
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.corpo {
+  padding: var(--sp-5);
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+
+.descricao {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+.extra {
+  margin-top: var(--sp-4);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+}
+
+.acoes {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+}
