@@ -1,5 +1,8 @@
 // criarApp com db falso: roda sem Postgres. Cobre a fronteira HTTP — auth, CSRF, rate limit,
 // tratador de erro, log — e as duas correções de bug no que elas mandam ao banco.
+// A1: o modo dos comentários (estado.comentariosMigrados) é explícito em cada subida; o padrão
+// daqui é o LEGADO, o que a A0 fazia. O comportamento contra Postgres real está em
+// integracao.test.js (TEST_DATABASE_URL).
 
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -26,20 +29,24 @@ before(() => definirSaida((_nivel, linha) => logs.push(JSON.parse(linha))));
 after(() => definirSaida(null));
 beforeEach(() => { logs = []; });
 
-/** db falso: registra cada query e responde com o que `responder` devolver. */
+/**
+ * db falso: registra cada query e responde com o que `responder` devolver. connect() empresta um
+ * "cliente" que escreve na mesma lista (BEGIN/COMMIT incluídos): os serviços da A1 escrevem em tx.
+ */
 function dbFalso(responder = () => undefined) {
   const chamadas = [];
-  return {
-    chamadas,
-    async query(sql, params) {
-      chamadas.push({ sql, params });
-      return (await responder(sql, params)) ?? { rows: [], rowCount: 0 };
-    },
+  const query = async (sql, params) => {
+    chamadas.push({ sql, params });
+    return (await responder(sql, params)) ?? { rows: [], rowCount: 0 };
   };
+  return { chamadas, query, connect: async () => ({ query, release() {} }) };
 }
 
-async function subir(db = dbFalso()) {
-  const app = criarApp({ config, db });
+const LEGADO = Object.freeze({ comentariosMigrados: false });
+const MIGRADO = Object.freeze({ comentariosMigrados: true });
+
+async function subir(db = dbFalso(), estado = LEGADO) {
+  const app = criarApp({ config, db, estado });
   const servidor = await new Promise((ok) => { const s = app.listen(0, "127.0.0.1", () => ok(s)); });
   const base = `http://127.0.0.1:${servidor.address().port}`;
   const chamar = async (metodo, caminho, { headers = {}, body } = {}) => {
@@ -134,7 +141,7 @@ test("Authorization presente decide sozinho: Bearer errado + cookie válido → 
 
 test("Bearer certo → origem mcp, e a rota responde no formato de hoje", async () => {
   const linha = linhaEntrada();
-  const s = await subir(dbFalso((sql) => (sql.startsWith("SELECT * FROM entries WHERE 1=1") ? { rows: [linha] } : undefined)));
+  const s = await subir(dbFalso((sql) => (sql.startsWith("SELECT * FROM entries WHERE deleted_at IS NULL") ? { rows: [linha] } : undefined)));
   try {
     const me = await s.chamar("GET", "/api/auth/me", { headers: BEARER });
     assert.deepEqual(me.json, { autenticado: true, origem: "mcp" });
@@ -319,8 +326,20 @@ test("respostas legadas de recusa continuam byte a byte", async () => {
       ["PATCH", `/api/tasks/${randomUUID()}`, "{}", 400, { error: "nothing to update" }],
       ["POST", "/api/meetings", JSON.stringify({ title: "x" }), 400, { error: "title and date required" }],
       ["PATCH", `/api/meetings/${randomUUID()}`, JSON.stringify({ title: "x" }), 404, { error: "Not found" }],
-      ["PATCH", `/api/projects/${randomUUID()}`, JSON.stringify({ name: "x" }), 200, { success: true }],
       ["DELETE", `/api/projects/${randomUUID()}`, undefined, 200, { success: true }],
+      ["DELETE", `/api/frentes/${randomUUID()}`, undefined, 200, { success: true }],
+      ["DELETE", `/api/tasks/${randomUUID()}`, undefined, 200, { success: true }],
+      ["DELETE", `/api/meetings/${randomUUID()}`, undefined, 200, { success: true }],
+      // A1: o que mudou de propósito. PATCH de id inexistente (ou excluído) em projeto, frente e
+      // tarefa era {success:true} sem escrever nada; frente/tarefa em pai inexistente era 500 da FK.
+      ["PATCH", `/api/projects/${randomUUID()}`, JSON.stringify({ name: "x" }), 404, { error: "Not found" }],
+      ["PATCH", `/api/frentes/${randomUUID()}`, JSON.stringify({ name: "x" }), 404, { error: "Not found" }],
+      ["PATCH", `/api/tasks/${randomUUID()}`, JSON.stringify({ name: "x" }), 404, { error: "Not found" }],
+      ["POST", `/api/projects/${randomUUID()}/frentes`, JSON.stringify({ name: "x" }), 404, { error: "Not found" }],
+      ["POST", `/api/frentes/${randomUUID()}/tasks`, JSON.stringify({ name: "x" }), 404, { error: "Not found" }],
+      // A1: restaurar o que não existe (ou não está excluído) → 404 em todas.
+      ...["entries", "projects", "frentes", "tasks", "meetings"].map((r) =>
+        ["POST", `/api/${r}/${randomUUID()}/restaurar`, "{}", 404, { error: "Not found" }]),
     ];
     for (const [metodo, caminho, body, status, json] of casos) {
       const r = await s.chamar(metodo, caminho, { ...h, body });
@@ -331,8 +350,9 @@ test("respostas legadas de recusa continuam byte a byte", async () => {
 });
 
 // ─── Correções de bug ───
-test("PATCH /api/tasks/:id manda comments ao jsonb como JSON, não como array do Postgres", async () => {
-  const s = await subir();
+test("PATCH /api/tasks/:id manda comments ao jsonb como JSON, não como array do Postgres (modo legado)", async () => {
+  const tarefa = { id: "t1", frente_id: "f1", name: "T", acao: "", status: "Pendente", stakeholder: "", deadline: null, holder: "", sort_order: 0, comments: [], kanban_status: "A fazer", start_date: null };
+  const s = await subir(dbFalso((sql) => (sql.startsWith("SELECT t.* FROM tasks t") ? { rows: [tarefa] } : undefined)));
   try {
     const comments = [{ id: "c1", text: "primeiro comentário", createdAt: "2026-10-03T12:00:00.000Z" }];
     const r = await s.chamar("PATCH", `/api/tasks/${randomUUID()}`, {
@@ -377,20 +397,25 @@ test("POST /api/entries sem data usa o hoje de Brasília", async () => {
 });
 
 // ─── Guardas reflexivas ───
-test("as URLs são exatamente as de antes, mais as três de auth", async () => {
+test("as URLs são exatamente as de antes, mais as três de auth e as dez da A1", async () => {
   const s = await subir();
   try {
     const rotas = s.app.locals.rotas.map((r) => `${r.metodo} ${r.template}`).sort();
     assert.deepEqual(rotas, [
+      "DELETE /api/comentarios/:id",
       "DELETE /api/entries/:id", "DELETE /api/frentes/:id", "DELETE /api/meetings/:id",
       "DELETE /api/projects/:id", "DELETE /api/tasks/:id",
-      "GET /api/auth/me", "GET /api/entries", "GET /api/entries/:id", "GET /api/entries/stats",
-      "GET /api/entries/upcoming", "GET /api/health", "GET /api/meetings", "GET /api/projects",
+      "GET /api/auth/me", "GET /api/comentarios", "GET /api/entries", "GET /api/entries/:id", "GET /api/entries/stats",
+      "GET /api/entries/upcoming", "GET /api/health", "GET /api/historico/:tipo/:id", "GET /api/meetings", "GET /api/projects",
       "PATCH /api/entries/:id", "PATCH /api/frentes/:id", "PATCH /api/meetings/:id",
       "PATCH /api/projects/:id", "PATCH /api/tasks/:id",
-      "POST /api/auth/login", "POST /api/auth/logout", "POST /api/entries",
-      "POST /api/frentes/:frenteId/tasks", "POST /api/meetings", "POST /api/projects",
-      "POST /api/projects/:projectId/frentes",
+      "POST /api/auth/login", "POST /api/auth/logout",
+      "POST /api/comentarios", "POST /api/comentarios/:id/restaurar",
+      "POST /api/entries", "POST /api/entries/:id/restaurar",
+      "POST /api/frentes/:frenteId/tasks", "POST /api/frentes/:id/restaurar",
+      "POST /api/meetings", "POST /api/meetings/:id/restaurar",
+      "POST /api/projects", "POST /api/projects/:id/restaurar",
+      "POST /api/projects/:projectId/frentes", "POST /api/tasks/:id/restaurar",
     ]);
   } finally { await s.fechar(); }
 });
@@ -429,5 +454,226 @@ test("rota desconhecida autenticada → 404, logada como nao_roteada", async () 
     assert.equal(r.status, 404);
     await esperarLogs();
     assert.equal(logs.find((l) => l.evento === "HTTP_REQ").rota, "nao_roteada");
+  } finally { await s.fechar(); }
+});
+
+// ─── A1: modo dos comentários, histórico, exclusão lógica ───
+test("criarApp exige o estado dos comentários: sem ele, não sobe (nunca adivinha o modo)", () => {
+  assert.throws(() => criarApp({ config, db: dbFalso() }), /estado\.comentariosMigrados/);
+  assert.throws(() => criarApp({ config, db: dbFalso(), estado: { comentariosMigrados: "sim" } }), /estado\.comentariosMigrados/);
+});
+
+test("modo legado: a API de comentários responde 503 comentarios_indisponiveis, sem tocar o banco", async () => {
+  const s = await subir();
+  const h = { headers: { ...BEARER, ...JSON_CT } };
+  try {
+    const casos = [
+      ["GET", `/api/comentarios?alvo_tipo=TAREFA&alvo_id=${randomUUID()}`, undefined],
+      ["POST", "/api/comentarios", JSON.stringify({ alvo_tipo: "TAREFA", alvo_id: randomUUID(), texto: "oi" })],
+      ["DELETE", `/api/comentarios/${randomUUID()}`, undefined],
+      ["POST", `/api/comentarios/${randomUUID()}/restaurar`, "{}"],
+    ];
+    for (const [metodo, caminho, body] of casos) {
+      const r = await s.chamar(metodo, caminho, { ...h, body });
+      assert.equal(r.status, 503, `${metodo} ${caminho}`);
+      assert.deepEqual(r.json, { error: "comentarios_indisponiveis" });
+    }
+    assert.equal(s.db.chamadas.length, 0);
+    await esperarLogs();
+    assert.ok(logs.filter((l) => l.evento === "HTTP_REQ").every((l) => l.motivo === "COMENTARIOS_INDISPONIVEIS"));
+  } finally { await s.fechar(); }
+});
+
+test("DELETE de tarefa inexistente: o corpo legado {success:true}, mas o motivo vai ao log", async () => {
+  const s = await subir();
+  try {
+    const r = await s.chamar("DELETE", `/api/tasks/${randomUUID()}`, { headers: BEARER });
+    assert.deepEqual([r.status, r.json], [200, { success: true }]);
+    const update = s.db.chamadas.find((c) => c.sql.startsWith("UPDATE tasks"));
+    assert.match(update.sql, /SET deleted_at = NOW\(\) WHERE id = \$1 AND deleted_at IS NULL/);
+    assert.match(update.sql, /AND EXISTS \(SELECT 1 FROM tarefas_visiveis v WHERE v\.id = tasks\.id\)/,
+      "tarefa escondida pelo pai excluído é inexistente também para o DELETE");
+    assert.ok(!s.db.chamadas.some((c) => /^DELETE/i.test(c.sql)), "nenhum DELETE físico");
+    await esperarLogs();
+    const req = logs.find((l) => l.evento === "HTTP_REQ");
+    assert.deepEqual([req.status, req.motivo], [200, "NAO_ENCONTRADO"]);
+  } finally { await s.fechar(); }
+});
+
+test("DELETE só carimba frente/tarefa VISÍVEL; entrada, projeto e reunião não passam por view", async () => {
+  const s = await subir();
+  try {
+    for (const [caminho, tabela, view] of [
+      ["frentes", "frentes", "frentes_visiveis"], ["tasks", "tasks", "tarefas_visiveis"],
+      ["projects", "projects", null], ["meetings", "meetings", null], ["entries", "entries", null],
+    ]) {
+      s.db.chamadas.length = 0;
+      await s.chamar("DELETE", `/api/${caminho}/${randomUUID()}`, { headers: BEARER });
+      const update = s.db.chamadas.find((c) => c.sql.startsWith(`UPDATE ${tabela}`));
+      if (view) assert.ok(update.sql.includes(`EXISTS (SELECT 1 FROM ${view} v WHERE v.id = ${tabela}.id)`), caminho);
+      else assert.ok(!update.sql.includes("EXISTS"), caminho);
+    }
+  } finally { await s.fechar(); }
+});
+
+test("GET /api/historico: tipo fora de ENTIDADES → 400; tipo válido → {eventos} do mais novo ao mais antigo", async () => {
+  const s = await subir(dbFalso((sql) => (sql.includes("FROM historico") ? {
+    rows: [{ id: "7", entidade_tipo: "TAREFA", entidade_id: "t1", acao: "ATUALIZADO", mudancas: [{ campo: "status", de: "Pendente", para: "Concluído" }],
+      origem: "mcp", turno_id: null, desfaz_id: null, criado_em: new Date("2026-10-03T12:00:00Z") }],
+  } : undefined)));
+  try {
+    const ruim = await s.chamar("GET", "/api/historico/tarefa/t1", { headers: BEARER });
+    assert.deepEqual([ruim.status, ruim.json], [400, { error: "tipo_invalido" }]);
+    const ok = await s.chamar("GET", "/api/historico/TAREFA/t1", { headers: BEARER });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.json.eventos[0], {
+      id: 7, entidade_tipo: "TAREFA", entidade_id: "t1", acao: "ATUALIZADO",
+      mudancas: [{ campo: "status", de: "Pendente", para: "Concluído" }],
+      origem: "mcp", turno_id: null, desfaz_id: null, criado_em: "2026-10-03T12:00:00.000Z",
+    });
+    const consulta = s.db.chamadas.find((c) => c.sql.includes("FROM historico"));
+    assert.match(consulta.sql, /ORDER BY id DESC/);
+    assert.deepEqual(consulta.params, ["TAREFA", "t1"]);
+  } finally { await s.fechar(); }
+});
+
+test("modo migrado: os GETs montam threads/comments da tabela, com as chaves e a ordem do legado", async () => {
+  const entrada = { ...linhaEntrada("e1"), threads: [{ id: "velho", text: "backup jsonb", createdAt: "2020-01-01T00:00:00.000Z" }] };
+  const reuniao = { id: "r1", title: "R", date: "2026-10-05", start_time: "", end_time: "", description: "", comments: [{ id: "velho" }], must: "", created_at: new Date() };
+  const tarefa = { id: "t1", frente_id: "f1", name: "T", acao: "", status: "Pendente", stakeholder: "", deadline: null, holder: "", comments: [{ id: "velho" }], kanban_status: "A fazer", start_date: null };
+  const criado = new Date("2026-10-02T09:30:00Z");
+  const s = await subir(dbFalso((sql, params) => {
+    if (sql.startsWith("SELECT * FROM entries WHERE deleted_at IS NULL")) return { rows: [entrada] };
+    if (sql.startsWith("SELECT * FROM meetings WHERE deleted_at IS NULL")) return { rows: [reuniao] };
+    if (sql.startsWith("SELECT * FROM projects")) return { rows: [{ id: "p1", name: "P", status: "Em andamento", holder: "Nós" }] };
+    if (sql.startsWith("SELECT * FROM frentes_visiveis")) return { rows: [{ id: "f1", project_id: "p1", name: "F" }] };
+    if (sql.startsWith("SELECT * FROM tarefas_visiveis")) return { rows: [tarefa] };
+    if (sql.includes("FROM comentarios") && sql.includes("ANY($2)")) {
+      return { rows: params[1].map((alvo) => ({ id: `c-${alvo}`, alvo_id: alvo, texto: `sobre ${alvo}`, criado_em: criado })) };
+    }
+  }), MIGRADO);
+  try {
+    const e = await s.chamar("GET", "/api/entries", { headers: BEARER });
+    assert.deepEqual(e.json.entries[0].threads, [{ id: "c-e1", text: "sobre e1", createdAt: "2026-10-02T09:30:00.000Z" }]);
+    assert.deepEqual(Object.keys(e.json.entries[0].threads[0]), ["id", "text", "createdAt"]);
+
+    const m = await s.chamar("GET", "/api/meetings", { headers: BEARER });
+    assert.deepEqual(m.json.meetings[0].comments, [{ id: "c-r1", text: "sobre r1", created_at: "2026-10-02T09:30:00.000Z" }]);
+    assert.deepEqual(Object.keys(m.json.meetings[0].comments[0]), ["id", "text", "created_at"]);
+
+    const p = await s.chamar("GET", "/api/projects", { headers: BEARER });
+    assert.deepEqual(p.json.projects[0].frentes[0].tasks[0].comments, [{ id: "c-t1", text: "sobre t1", created_at: "2026-10-02T09:30:00.000Z" }]);
+
+    const alvos = s.db.chamadas.filter((c) => c.sql.includes("FROM comentarios")).map((c) => c.params[0]);
+    assert.deepEqual(alvos, ["ENTRADA", "REUNIAO", "TAREFA"], "uma consulta por lista, não uma por linha");
+  } finally { await s.fechar(); }
+});
+
+/** db falso de uma tarefa migrada com dois comentários vivos (a, b) e um excluído (x). */
+function dbTarefaMigrada() {
+  const tarefa = { id: "t1", frente_id: "f1", name: "T", acao: "", status: "Pendente", stakeholder: "", deadline: null, holder: "", sort_order: 0, comments: [], kanban_status: "A fazer", start_date: null };
+  return dbFalso((sql, params) => {
+    if (sql.startsWith("SELECT t.* FROM tasks t")) return { rows: [tarefa] };
+    if (sql.startsWith("SELECT id, texto, deleted_at FROM comentarios")) {
+      return { rows: [
+        { id: "a", texto: "A", deleted_at: null }, { id: "b", texto: "B", deleted_at: null },
+        { id: "x", texto: "X", deleted_at: new Date("2026-10-02T00:00:00Z") },
+      ] };
+    }
+    if (sql.trim().startsWith("INSERT INTO comentarios")) {
+      return { rows: [{ id: params[0], alvo_tipo: params[1], alvo_id: params[2], texto: params[3], criado_em: new Date(params[4]), deleted_at: null, origem: params[5] }] };
+    }
+    if (sql.startsWith("UPDATE comentarios SET texto")) return { rows: [{ id: params[0], texto: params[1] }] };
+    if (sql.startsWith("UPDATE comentarios SET deleted_at = NOW()")) return { rows: [{ id: params[0], deleted_at: new Date() }] };
+  });
+}
+const patchTarefa = (s, comments) =>
+  s.chamar("PATCH", "/api/tasks/t1", { headers: { ...BEARER, ...JSON_CT }, body: JSON.stringify({ comments }) });
+
+test("modo migrado: PATCH com o array inteiro vira diff de linhas (insere, edita; remove um) e loga LEGADO_ARRAY_PATCH", async () => {
+  const s = await subir(dbTarefaMigrada(), MIGRADO);
+  try {
+    const r = await patchTarefa(s, [
+      { id: "a", text: "A editado", created_at: "2026-10-01T10:00:00.000Z" },
+      { id: "b", text: "B", created_at: "2026-10-01T11:00:00.000Z" },
+      { id: "c", text: "C novo", created_at: "2026-10-03T10:00:00.000Z" },
+    ]);
+    assert.deepEqual([r.status, r.json], [200, { success: true }]);
+
+    const sqls = s.db.chamadas.map((c) => c.sql);
+    assert.ok(!sqls.some((q) => q.startsWith("UPDATE tasks")), "só comments no corpo: a tarefa não é tocada, e o jsonb (backup) também não");
+    assert.ok(!sqls.some((q) => q.startsWith("UPDATE comentarios SET deleted_at")), "o x excluído não volta, e ninguém sai");
+    const insert = s.db.chamadas.find((c) => c.sql.trim().startsWith("INSERT INTO comentarios"));
+    assert.deepEqual(insert.params, ["c", "TAREFA", "t1", "C novo", "2026-10-03T10:00:00.000Z", "mcp"]);
+    assert.deepEqual(s.db.chamadas.find((c) => c.sql.startsWith("UPDATE comentarios SET texto")).params, ["a", "A editado"]);
+
+    let historico = s.db.chamadas.filter((c) => c.sql.includes("INSERT INTO historico"));
+    assert.deepEqual(historico.map((c) => [c.params[0], c.params[1], c.params[2], c.params[4]]), [
+      ["COMENTARIO", "c", "CRIADO", "mcp"], ["COMENTARIO", "a", "ATUALIZADO", "mcp"],
+    ]);
+    assert.deepEqual(JSON.parse(historico[1].params[3]), [{ campo: "texto", de: "A", para: "A editado" }]);
+
+    let legado = logs.find((l) => l.evento === "LEGADO_ARRAY_PATCH");
+    assert.deepEqual(
+      [legado.nivel, legado.alvo_tipo, legado.inseridos, legado.removidos, legado.editados, legado.remocoes_ignoradas, legado.restauros_ignorados],
+      ["info", "TAREFA", 1, 0, 1, 0, 0]);
+    assert.ok(!JSON.stringify(logs).includes("A editado"), "texto de comentário nunca vai ao log");
+
+    // remover um: o array sem o b (e sem o x, que já estava excluído)
+    s.db.chamadas.length = 0; logs = [];
+    assert.equal((await patchTarefa(s, [{ id: "a", text: "A", created_at: "2026-10-01T10:00:00.000Z" }])).status, 200);
+    assert.deepEqual(s.db.chamadas.find((c) => c.sql.startsWith("UPDATE comentarios SET deleted_at")).params, ["b"]);
+    historico = s.db.chamadas.filter((c) => c.sql.includes("INSERT INTO historico"));
+    assert.deepEqual(historico.map((c) => [c.params[1], c.params[2]]), [["b", "EXCLUIDO"]]);
+    legado = logs.find((l) => l.evento === "LEGADO_ARRAY_PATCH");
+    assert.deepEqual([legado.inseridos, legado.removidos, legado.restauros_ignorados], [0, 1, 0]);
+  } finally { await s.fechar(); }
+});
+
+test("modo migrado: array de retrato velho — adicionar não exclui nem ressuscita; remover dois é 409 sem escrita", async () => {
+  const s = await subir(dbTarefaMigrada(), MIGRADO);
+  try {
+    // O retrato só conhece o a e o x (de antes do DELETE); o b nasceu depois. O cliente acrescenta o d.
+    const r = await patchTarefa(s, [
+      { id: "a", text: "A", created_at: "2026-10-01T10:00:00.000Z" },
+      { id: "x", text: "X", created_at: "2026-10-01T12:00:00.000Z" },
+      { id: "d", text: "D", created_at: "2026-10-03T10:00:00.000Z" },
+    ]);
+    assert.deepEqual([r.status, r.json], [200, { success: true }]);
+    const escritas = s.db.chamadas.filter((c) => /^(INSERT|UPDATE)/.test(c.sql.trim()) && !c.sql.includes("historico"));
+    assert.deepEqual(escritas.map((c) => [c.sql.trim().split(" ").slice(0, 3).join(" "), c.params[0]]),
+      [["INSERT INTO comentarios", "d"]], "só o d nasce: o b continua vivo, o x continua excluído");
+    const historico = s.db.chamadas.filter((c) => c.sql.includes("INSERT INTO historico"));
+    assert.deepEqual(historico.map((c) => [c.params[1], c.params[2]]), [["d", "CRIADO"]], "nenhum RESTAURADO, nenhum EXCLUIDO");
+    const legado = logs.find((l) => l.evento === "LEGADO_ARRAY_PATCH");
+    assert.deepEqual([legado.nivel, legado.inseridos, legado.removidos, legado.remocoes_ignoradas, legado.restauros_ignorados],
+      ["warn", 1, 0, 1, 1]);
+
+    // O mesmo retrato velho tirando o a: faltam a e b — não há como saber qual o usuário apagou.
+    s.db.chamadas.length = 0; logs = [];
+    const ambigua = await patchTarefa(s, [{ id: "x", text: "X", created_at: "2026-10-01T12:00:00.000Z" }]);
+    assert.deepEqual([ambigua.status, ambigua.json], [409, { error: "comentarios_desatualizados" }]);
+    assert.ok(!s.db.chamadas.some((c) => /^(INSERT|UPDATE)/.test(c.sql.trim())), "nenhuma escrita, nem de histórico");
+    await esperarLogs();
+    const aviso = logs.find((l) => l.evento === "LEGADO_REMOCAO_AMBIGUA");
+    assert.deepEqual([aviso.nivel, aviso.alvo_tipo, aviso.remocoes, aviso.vivas], ["warn", "TAREFA", 2, 2]);
+    assert.equal(logs.find((l) => l.evento === "HTTP_REQ").motivo, "COMENTARIOS_DESATUALIZADOS");
+    assert.equal(logs.find((l) => l.evento === "LEGADO_ARRAY_PATCH"), undefined, "recusa não é trabalho do adaptador");
+  } finally { await s.fechar(); }
+});
+
+test("modo migrado: array legado ilegível → 400 comentarios_invalidos, sem nenhuma escrita", async () => {
+  const reuniao = { id: "r1", title: "R", date: "2026-10-05", start_time: "", end_time: "", description: "", comments: [], must: "", created_at: new Date() };
+  const s = await subir(dbFalso((sql) => {
+    if (sql.startsWith("SELECT * FROM meetings WHERE id")) return { rows: [reuniao] };
+  }), MIGRADO);
+  try {
+    for (const comments of [[{ id: "x" }], [42], "não é array"]) {
+      const r = await s.chamar("PATCH", "/api/meetings/r1", {
+        headers: { ...BEARER, ...JSON_CT }, body: JSON.stringify({ title: "novo título", comments }),
+      });
+      assert.deepEqual([r.status, r.json], [400, { error: "comentarios_invalidos" }], JSON.stringify(comments));
+    }
+    assert.ok(!s.db.chamadas.some((c) => /^(INSERT|UPDATE)/.test(c.sql.trim())), "nem o título foi gravado");
   } finally { await s.fechar(); }
 });

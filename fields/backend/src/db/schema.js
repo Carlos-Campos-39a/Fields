@@ -1,12 +1,22 @@
 import { v4 as uuidv4 } from "uuid";
 import { log } from "../lib/log.js";
 import { hojeISO, somarDias } from "../lib/datas.js";
+import { ACOES_HISTORICO, ALVOS_COMENTARIO, ENTIDADES, ORIGENS } from "../dominio/enums.js";
+import { aplicarMigracoes } from "./migracoes.js";
 
-// Schema e seed, movidos LITERALMENTE do server.js monolítico (mesmos CREATE/ALTER, mesmo seed).
-// Tudo idempotente: roda a cada boot. A tabela `migracoes` registra migrações de dado one-shot
-// (a partir da A1): o nome é a chave, e a presença da linha é o "já rodou".
-export async function initDB(db) {
-  await db.query(`
+// Schema e seed. Tudo idempotente: roda a cada boot, e um statement que falha DERRUBA o boot (o
+// healthcheck do Railway segura o deploy anterior no ar). Migração de DADO é outra coisa: mora em
+// db/migracoes.js, e a falha dela não derruba nada (ver initDB).
+
+/** Lista SQL ('A','B') a partir de um enum de dominio/enums.js — o CHECK nunca repete os valores. */
+export function listaSql(valores) {
+  return valores.map((v) => `'${String(v).replaceAll("'", "''")}'`).join(",");
+}
+
+// ─── A0: movido LITERALMENTE do server.js monolítico (mesmos CREATE/ALTER) ───
+// A tabela `migracoes` registra migrações de dado one-shot (a partir da A1): o nome é a chave, e a
+// presença da linha é o "já rodou".
+export const DDL_BASE = `
     CREATE TABLE IF NOT EXISTS entries (
       id          TEXT PRIMARY KEY,
       type        TEXT        NOT NULL DEFAULT 'note',
@@ -66,9 +76,75 @@ export async function initDB(db) {
       nome        TEXT PRIMARY KEY,
       aplicada_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-  `);
+`;
 
-  // Seed if empty
+// ─── A1: domínio desfazível — aditivo, nada do A0 muda ───
+//
+// deleted_at nas cinco tabelas: excluir vira carimbo (servicos/exclusao.js).
+//
+// As views são a CASCATA LÓGICA: projeto excluído esconde as frentes, frente excluída (ou de
+// projeto excluído) esconde as tarefas — sem carimbar os filhos, então restaurar o pai devolve
+// tudo, e o filho excluído sozinho continua excluído. Leitura de frentes/tarefas passa SÓ por elas
+// (test/schema.test.js varre os serviços).
+//   ATENÇÃO: o `*` expande na CRIAÇÃO da view. Coluna NOVA em frentes/tasks: o ALTER vem antes
+//   daqui, e o CREATE OR REPLACE acrescenta a coluna no fim (permitido). Mudar o TIPO ou REMOVER
+//   uma coluna dessas tabelas exige `DROP VIEW tarefas_visiveis, frentes_visiveis` antes — o
+//   CREATE OR REPLACE falha, e falha de schema derruba o boot.
+//
+// comentarios: uma linha por comentário (era array jsonb dentro da entidade; a cópia é a migração
+// comentarios_v1). historico: o diff de cada escrita, gravado pelos serviços no mesmo tx.
+//   Os CHECKs são montados dos enums. Valor NOVO num enum exige migração própria do CHECK
+//   (ALTER TABLE ... DROP CONSTRAINT <nome>, ADD CONSTRAINT <nome> CHECK (...)): o CREATE TABLE IF
+//   NOT EXISTS não reescreve o CHECK de tabela existente. Por isso os nomes são explícitos.
+export const DDL_A1 = `
+    ALTER TABLE entries  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    ALTER TABLE frentes  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    ALTER TABLE tasks    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    ALTER TABLE meetings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+    CREATE OR REPLACE VIEW frentes_visiveis AS
+      SELECT f.* FROM frentes f JOIN projects p ON p.id = f.project_id
+      WHERE f.deleted_at IS NULL AND p.deleted_at IS NULL;
+    CREATE OR REPLACE VIEW tarefas_visiveis AS
+      SELECT t.* FROM tasks t JOIN frentes_visiveis f ON f.id = t.frente_id
+      WHERE t.deleted_at IS NULL;
+
+    CREATE TABLE IF NOT EXISTS comentarios (
+      id          TEXT PRIMARY KEY,
+      alvo_tipo   TEXT        NOT NULL CONSTRAINT comentarios_alvo_tipo_check CHECK (alvo_tipo IN (${listaSql(ALVOS_COMENTARIO)})),
+      alvo_id     TEXT        NOT NULL,
+      texto       TEXT        NOT NULL,
+      criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at  TIMESTAMPTZ,
+      origem      TEXT        NOT NULL DEFAULT 'web' CONSTRAINT comentarios_origem_check CHECK (origem IN (${listaSql(ORIGENS)}))
+    );
+    CREATE INDEX IF NOT EXISTS comentarios_alvo_idx ON comentarios (alvo_tipo, alvo_id) WHERE deleted_at IS NULL;
+
+    CREATE TABLE IF NOT EXISTS historico (
+      id            BIGSERIAL PRIMARY KEY,
+      entidade_tipo TEXT        NOT NULL CONSTRAINT historico_entidade_tipo_check CHECK (entidade_tipo IN (${listaSql(ENTIDADES)})),
+      entidade_id   TEXT        NOT NULL,
+      acao          TEXT        NOT NULL CONSTRAINT historico_acao_check CHECK (acao IN (${listaSql(ACOES_HISTORICO)})),
+      mudancas      JSONB       NOT NULL DEFAULT '[]',
+      origem        TEXT        NOT NULL CONSTRAINT historico_origem_check CHECK (origem IN (${listaSql(ORIGENS)})),
+      turno_id      TEXT,
+      desfaz_id     BIGINT      REFERENCES historico(id),
+      criado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS historico_entidade_idx ON historico (entidade_tipo, entidade_id, id DESC);
+`;
+
+/**
+ * Schema → seed → migrações de dado. Devolve o `estado` que o app precisa saber do banco:
+ * {comentariosMigrados} — false quando a migração comentarios_v1 falhou (MIGRACAO_FALHOU no log),
+ * e o app inteiro segue no modo legado (arrays jsonb, como na A0) em vez de cair.
+ */
+export async function initDB(db) {
+  await db.query(DDL_BASE);
+  await db.query(DDL_A1);
+
+  // Seed if empty (conta também as excluídas: excluir tudo não ressemeia o banco)
   const { rows } = await db.query("SELECT COUNT(*) FROM entries");
   if (parseInt(rows[0].count) === 0) {
     const today    = hojeISO();
@@ -92,5 +168,8 @@ export async function initDB(db) {
     }
     log.info("DB_SEED", { entradas: seed.length });
   }
-  log.info("DB_PRONTO");
+
+  const estado = await aplicarMigracoes(db);
+  log.info("DB_PRONTO", { comentarios_migrados: estado.comentariosMigrados });
+  return estado;
 }

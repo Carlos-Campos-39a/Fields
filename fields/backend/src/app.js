@@ -1,5 +1,6 @@
-// criarApp({config, db}) monta o Express sem abrir porta nem banco: o teste injeta um db falso e
-// roda sem Postgres. O bootstrap (server.js) passa o pool real.
+// criarApp({config, db, estado}) monta o Express sem abrir porta nem banco: o teste injeta um db
+// falso e roda sem Postgres. O bootstrap (server.js) passa o pool real e o `estado` que o initDB
+// leu do banco ({comentariosMigrados}: a migração comentarios_v1 rodou ou não — ver db/schema.js).
 //
 // Ordem: log de request → rotas públicas (health, login) → exigirAuth → JSON → rotas protegidas
 // → tratador de erro. Sem pacote cors e sem cabeçalho CORS nenhum: o front chega pela mesma
@@ -16,22 +17,32 @@ import { rotasAuth, rotasLogin } from "./rotas/auth.js";
 import { rotasEntradas } from "./rotas/entradas.js";
 import { rotasProjetos } from "./rotas/projetos.js";
 import { rotasReunioes } from "./rotas/reunioes.js";
+import { rotasComentarios } from "./rotas/comentarios.js";
+import { rotasHistorico } from "./rotas/historico.js";
 
 /** As únicas rotas que respondem sem credencial. Um teste trava esta lista. */
 export const ROTAS_PUBLICAS = Object.freeze(["GET /api/health", "POST /api/auth/login"]);
 
 const PG_CODIGO = /^[0-9A-Z]{5}$/; // SQLSTATE: seguro de logar, ao contrário da mensagem do pg
 
-export function criarApp({ config, db, limitador = criarLimitador() } = {}) {
+export function criarApp({ config, db, estado, limitador = criarLimitador() } = {}) {
   if (!config) throw new TypeError("criarApp: config é obrigatória");
   if (!db) throw new TypeError("criarApp: db é obrigatório");
+  // Sem default: um app que "achasse" o modo dos comentários leria de um lugar e escreveria em outro.
+  if (typeof estado?.comentariosMigrados !== "boolean") {
+    throw new TypeError("criarApp: estado.comentariosMigrados é obrigatório (vem do initDB)");
+  }
 
   const app = express();
   app.set("trust proxy", true); // Railway (e a Vercel na frente): req.ip vem do X-Forwarded-For
   app.disable("x-powered-by");
 
   const publicas = [rotasSaude(), rotasLogin({ config, limitador })];
-  const protegidas = [rotasAuth(), rotasEntradas({ db }), rotasProjetos({ db }), rotasReunioes({ db })];
+  const protegidas = [
+    rotasAuth(),
+    rotasEntradas({ db, estado }), rotasProjetos({ db, estado }), rotasReunioes({ db, estado }),
+    rotasComentarios({ db, estado }), rotasHistorico({ db, estado }),
+  ];
   const tabela = tabelaDeRotas("/api", [...publicas, ...protegidas]);
   const rotaDe = (req) => rotaDaTabela(req, tabela);
   app.locals.rotas = tabela.map(({ metodo, template }) => ({ metodo, template }));
