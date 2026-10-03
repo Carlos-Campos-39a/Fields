@@ -10,7 +10,10 @@
  *     "fields": {
  *       "command": "node",
  *       "args": ["/caminho/para/fields-project/fields/mcp/server.js"],
- *       "env": { "FIELDS_API_URL": "https://SEU-APP.railway.app/api" }
+ *       "env": {
+ *         "FIELDS_API_URL": "https://SEU-APP.railway.app/api",
+ *         "FIELDS_API_TOKEN": "<o mesmo FIELDS_API_TOKEN do backend>"
+ *       }
  *     }
  *   }
  * }
@@ -26,12 +29,17 @@ if (!BASE) {
   console.error("❌  FIELDS_API_URL não definida. Exemplo: https://meu-app.railway.app/api");
   process.exit(1);
 }
+const TOKEN = process.env.FIELDS_API_TOKEN;
+if (!TOKEN) {
+  console.error("❌  FIELDS_API_TOKEN não definida. Use o mesmo valor de FIELDS_API_TOKEN configurado no backend (a API exige Bearer).");
+  process.exit(1);
+}
 
 // ─── HTTP helper ─────────────────────────────────────────────
 async function api(method, path, body) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
     body: body != null ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();

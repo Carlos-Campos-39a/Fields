@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { api } from "./api.js";
+import { toISODateLocal, isTodayLocal } from "./lib/dates.js";
+import { sair } from "./auth/sessao.js";
 
 // ─── Constants ──────────────────────────────────────────────
 const TYPE = {
@@ -700,7 +702,7 @@ function InputBar({ onCreated, bordered = false }) {
     try {
       const { entry } = await api.createEntry({
         type, title: body.slice(0, 80) + (body.length > 80 ? "…" : ""),
-        content: body, tags: [], date: new Date().toISOString().split("T")[0],
+        content: body, tags: [], // sem date: o backend grava o dia de hoje em São Paulo
       });
       onCreated(entry);
       setText("");
@@ -1668,8 +1670,8 @@ function getMonday(date) {
   return d;
 }
 function shiftDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
-function toISO(date) { return date.toISOString().split("T")[0]; }
-function isToday(dateStr) { return dateStr === toISO(new Date()); }
+function toISO(date) { return toISODateLocal(date); }   // dia em São Paulo, não em UTC
+function isToday(dateStr) { return isTodayLocal(dateStr); }
 function fmtTime(t) { return t || ""; }
 
 function AgendaView() {
@@ -2369,6 +2371,13 @@ export default function App() {
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(232,96,44,0.15)"; e.currentTarget.style.color = "#E8602C"; e.currentTarget.style.borderColor = "rgba(232,96,44,0.4)"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
             >⌂ Home</button>
+
+            {/* Sair */}
+            <button onClick={sair} title="Encerrar a sessão" style={{
+              background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "var(--r-full)", padding: "5px 12px",
+              fontSize: 13, color: "rgba(255,255,255,0.4)", cursor: "pointer",
+            }}>Sair</button>
 
             {/* Cards toggle button */}
             <button
