@@ -5,8 +5,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DDL_A1, DDL_BASE, listaSql } from "../src/db/schema.js";
-import { ACOES_HISTORICO, ALVOS_COMENTARIO, ENTIDADES, ORIGENS } from "../src/dominio/enums.js";
+import { DDL_A1, DDL_A2, DDL_BASE, listaSql } from "../src/db/schema.js";
+import {
+  ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, COLUNAS_KANBAN, COLUNA_FEITO, ENTIDADES, MEMORIA_ARQUIVADA,
+  MEMORIA_ATIVA, ORIGENS, STATUS, STATUS_CONCLUIDO, STATUS_MEMORIA, TIPOS_AGENDADOS, TIPOS_ENTRADA,
+} from "../src/dominio/enums.js";
+import { MEMORIA_TEXTO_MAX } from "../src/dominio/limites.js";
 
 test("listaSql monta a lista do CHECK a partir do enum (e escapa aspas)", () => {
   assert.equal(listaSql(["ENTRADA", "TAREFA"]), "'ENTRADA','TAREFA'");
@@ -67,4 +71,37 @@ test("serviços e rotas só leem frentes/tasks pelas views, salvo linha marcada 
   }
   assert.deepEqual(violacoes, []);
   assert.ok(marcadas > 0, "a varredura achou as exceções conhecidas (senão o padrão quebrou)");
+});
+
+// ─── A2 · memorias e agente_turnos ───
+
+test("A2: os CHECKs de memorias e agente_turnos são as listas dos enums; o teto do texto vem de limites.js", () => {
+  const checks = {
+    memorias_status_check: ["status", STATUS_MEMORIA],
+    memorias_origem_check: ["origem", ORIGENS],
+    agente_turnos_canal_check: ["canal", CANAIS],
+  };
+  for (const [nome, [coluna, valores]] of Object.entries(checks)) {
+    const esperado = `CONSTRAINT ${nome} CHECK (${coluna} IN (${listaSql(valores)}))`;
+    assert.ok(DDL_A2.includes(esperado), `${nome}: ${esperado}`);
+  }
+  assert.ok(DDL_A2.includes(`CONSTRAINT memorias_texto_check CHECK (char_length(texto) BETWEEN 1 AND ${MEMORIA_TEXTO_MAX})`));
+  assert.ok(DDL_A2.includes(`DEFAULT '${MEMORIA_ATIVA}'`));
+  assert.equal((DDL_A2.match(/CHECK \(/g) ?? []).length, Object.keys(checks).length + 1, "nenhum CHECK fora da lista acima");
+});
+
+test("A2 é aditiva: só CREATE ... IF NOT EXISTS, nada destrutivo, nenhuma tabela da A0/A1 alterada", () => {
+  assert.doesNotMatch(DDL_A2, /\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bALTER\b/i);
+  assert.doesNotMatch(DDL_A2, /CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/);
+  assert.deepEqual([...DDL_A2.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["memorias", "agente_turnos"]);
+});
+
+test("enums da A2: os valores com nome são membros das listas, e todo canal é também uma origem", () => {
+  assert.ok(STATUS.includes(STATUS_CONCLUIDO));
+  assert.ok(COLUNAS_KANBAN.includes(COLUNA_FEITO));
+  assert.ok(TIPOS_AGENDADOS.every((t) => TIPOS_ENTRADA.includes(t)));
+  assert.deepEqual([MEMORIA_ATIVA, MEMORIA_ARQUIVADA], [...STATUS_MEMORIA]);
+  // A escrita que chega por um canal grava histórico com a origem de mesmo nome.
+  for (const canal of CANAIS) assert.ok(ORIGENS.includes(canal), canal);
+  for (const lista of [TIPOS_ENTRADA, TIPOS_AGENDADOS, STATUS, COLUNAS_KANBAN, STATUS_MEMORIA, CANAIS]) assert.ok(Object.isFrozen(lista));
 });

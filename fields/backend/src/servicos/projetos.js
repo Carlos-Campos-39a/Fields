@@ -73,3 +73,11 @@ export async function excluirProjeto(db, ctx, id) {
 export async function restaurarProjeto(db, ctx, id) {
   return restaurarLogico(db, ctx, "PROJETO", id);
 }
+
+/** A2 · o projeto vivo, no formato do agente. Excluído ou inexistente → NAO_ENCONTRADO. */
+export async function obterProjeto(db, _ctx, id) {
+  const { rows } = await db.query("SELECT * FROM projects WHERE id = $1 AND deleted_at IS NULL", [id]);
+  if (rows.length === 0) return recusa("NAO_ENCONTRADO");
+  const r = rows[0];
+  return sucesso({ projeto_id: r.id, nome: r.name, status: r.status, holder: r.holder });
+}

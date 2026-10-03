@@ -19,6 +19,9 @@ import { rotasProjetos } from "./rotas/projetos.js";
 import { rotasReunioes } from "./rotas/reunioes.js";
 import { rotasComentarios } from "./rotas/comentarios.js";
 import { rotasHistorico } from "./rotas/historico.js";
+import { rotasOps } from "./rotas/ops.js";
+import { rotasOntologia } from "./rotas/ontologia.js";
+import { rotasAgente } from "./rotas/agente.js";
 
 /** As únicas rotas que respondem sem credencial. Um teste trava esta lista. */
 export const ROTAS_PUBLICAS = Object.freeze(["GET /api/health", "POST /api/auth/login"]);
@@ -42,6 +45,8 @@ export function criarApp({ config, db, estado, limitador = criarLimitador() } = 
     rotasAuth(),
     rotasEntradas({ db, estado }), rotasProjetos({ db, estado }), rotasReunioes({ db, estado }),
     rotasComentarios({ db, estado }), rotasHistorico({ db, estado }),
+    // A2: a ontologia (catálogo, operações, prompt) e o que a tela pede ao agente sem o modelo.
+    rotasOps({ db, estado }), rotasOntologia(), rotasAgente({ db, estado }),
   ];
   const tabela = tabelaDeRotas("/api", [...publicas, ...protegidas]);
   const rotaDe = (req) => rotaDaTabela(req, tabela);

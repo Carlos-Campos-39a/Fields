@@ -397,7 +397,7 @@ test("POST /api/entries sem data usa o hoje de Brasília", async () => {
 });
 
 // ─── Guardas reflexivas ───
-test("as URLs são exatamente as de antes, mais as três de auth e as dez da A1", async () => {
+test("as URLs são exatamente as de antes, mais as três de auth, as dez da A1 e as seis da A2", async () => {
   const s = await subir();
   try {
     const rotas = s.app.locals.rotas.map((r) => `${r.metodo} ${r.template}`).sort();
@@ -406,14 +406,18 @@ test("as URLs são exatamente as de antes, mais as três de auth e as dez da A1"
       "DELETE /api/entries/:id", "DELETE /api/frentes/:id", "DELETE /api/meetings/:id",
       "DELETE /api/projects/:id", "DELETE /api/tasks/:id",
       "GET /api/auth/me", "GET /api/comentarios", "GET /api/entries", "GET /api/entries/:id", "GET /api/entries/stats",
-      "GET /api/entries/upcoming", "GET /api/health", "GET /api/historico/:tipo/:id", "GET /api/meetings", "GET /api/projects",
+      "GET /api/entries/upcoming", "GET /api/health", "GET /api/historico/:tipo/:id", "GET /api/meetings",
+      "GET /api/ontologia", "GET /api/ontologia/prompt", "GET /api/ops",
+      "GET /api/projects", "GET /api/resumo-do-dia",
       "PATCH /api/entries/:id", "PATCH /api/frentes/:id", "PATCH /api/meetings/:id",
       "PATCH /api/projects/:id", "PATCH /api/tasks/:id",
+      "POST /api/agente/desfazer",
       "POST /api/auth/login", "POST /api/auth/logout",
       "POST /api/comentarios", "POST /api/comentarios/:id/restaurar",
       "POST /api/entries", "POST /api/entries/:id/restaurar",
       "POST /api/frentes/:frenteId/tasks", "POST /api/frentes/:id/restaurar",
       "POST /api/meetings", "POST /api/meetings/:id/restaurar",
+      "POST /api/ops/:name",
       "POST /api/projects", "POST /api/projects/:id/restaurar",
       "POST /api/projects/:projectId/frentes", "POST /api/tasks/:id/restaurar",
     ]);
