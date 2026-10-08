@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from "uuid";
 import { tx } from "../db/pool.js";
 import { hojeISO } from "../lib/datas.js";
 import { sucesso, recusa } from "../lib/erros.js";
-import { toEntry } from "./serializadores.js";
+import { entradaDoAgente, toEntry } from "./serializadores.js";
+import { padraoContem, sqlSemAcento } from "../lib/texto.js";
 import { registrar } from "./historico.js";
 import { excluirLogico, restaurarLogico } from "./exclusao.js";
 import { comentariosMigrados, executarLegado, legadosDe, logarLegado, planejarLegado } from "./comentarios.js";
@@ -164,4 +165,29 @@ export async function excluirEntrada(db, ctx, id) {
 
 export async function restaurarEntrada(db, ctx, id) {
   return restaurarLogico(db, ctx, "ENTRADA", id);
+}
+
+/**
+ * A2 · a busca do agente: texto sem caixa nem acento (título, conteúdo e tags), tipos, intervalo de
+ * data (inclusivo, sobre o TEXT ISO de entries.date), fixadas. Mais nova primeiro.
+ */
+export async function buscarEntradas(db, _ctx, { texto, tipos, de, ate, fixadas, limite = 20 } = {}) {
+  const where = ["deleted_at IS NULL"];
+  const params = [];
+  const p = (v) => { params.push(v); return `$${params.length}`; };
+  if (texto) {
+    const t = p(padraoContem(texto));
+    where.push(`(${sqlSemAcento("title")} LIKE ${t} OR ${sqlSemAcento("content")} LIKE ${t} OR ${sqlSemAcento("tags::text")} LIKE ${t})`);
+  }
+  if (Array.isArray(tipos) && tipos.length) where.push(`type = ANY(${p(tipos)})`);
+  if (de) where.push(`date >= ${p(de)}`);
+  if (ate) where.push(`date <= ${p(ate)}`);
+  if (typeof fixadas === "boolean") where.push(`pinned = ${p(fixadas)}`);
+  const { rows } = await db.query(
+    `SELECT * FROM entries WHERE ${where.join(" AND ")}
+     ORDER BY date DESC NULLS LAST, COALESCE(time, '') DESC, created_at DESC
+     LIMIT ${p(limite)}`,
+    params
+  );
+  return rows.map(entradaDoAgente);
 }

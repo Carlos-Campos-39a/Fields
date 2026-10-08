@@ -63,3 +63,14 @@ export async function excluirFrente(db, ctx, id) {
 export async function restaurarFrente(db, ctx, id) {
   return restaurarLogico(db, ctx, "FRENTE", id);
 }
+
+/** A2 · a frente visível com o nome do projeto (o agente fala "a frente X do projeto Y"). */
+export async function obterFrente(db, _ctx, id) {
+  const { rows } = await db.query(
+    "SELECT f.id, f.name, f.project_id, p.name AS projeto_nome FROM frentes_visiveis f JOIN projects p ON p.id = f.project_id WHERE f.id = $1",
+    [id]
+  );
+  if (rows.length === 0) return recusa("NAO_ENCONTRADO");
+  const r = rows[0];
+  return sucesso({ frente_id: r.id, nome: r.name, projeto_id: r.project_id, projeto: r.projeto_nome });
+}

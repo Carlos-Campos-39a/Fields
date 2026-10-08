@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
 import { log } from "../lib/log.js";
 import { hojeISO, somarDias } from "../lib/datas.js";
-import { ACOES_HISTORICO, ALVOS_COMENTARIO, ENTIDADES, ORIGENS } from "../dominio/enums.js";
+import { ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, ENTIDADES, MEMORIA_ATIVA, ORIGENS, STATUS_MEMORIA } from "../dominio/enums.js";
+import { MEMORIA_TEXTO_MAX } from "../dominio/limites.js";
 import { aplicarMigracoes } from "./migracoes.js";
 
 // Schema e seed. Tudo idempotente: roda a cada boot, e um statement que falha DERRUBA o boot (o
@@ -135,6 +136,46 @@ export const DDL_A1 = `
     CREATE INDEX IF NOT EXISTS historico_entidade_idx ON historico (entidade_tipo, entidade_id, id DESC);
 `;
 
+// ─── A2: ontologia e agente — aditivo, nada da A0/A1 muda ───
+//
+// memorias: o que o Carlos pediu para o assistente lembrar. Esquecer ARQUIVA (status + arquivado_em),
+// não apaga. O teto de ativas é do serviço (servicos/memorias.js), não do banco: ele recusa com
+// MEMORIA_CHEIA, e um CHECK não tem como contar linhas.
+//
+// agente_turnos: um pedido ao agente (um turno do chat, uma mensagem do WhatsApp, uma chamada de
+// escrita do MCP). `acoes` é a lista do que ele ESCREVEU, gravada no mesmo tx de cada escrita — é a
+// matéria-prima do desfazer, que inverte sem chamar LLM. `sessao_id` fica nulo até o motor (A2,
+// etapa seguinte) ter sessões; `status` sem CHECK porque os estados do motor (ESGOTADO…) ainda não
+// existem, e um CHECK prematuro exigiria migração no dia em que existirem.
+//
+// Mesma regra dos CHECKs da A1: valor novo em STATUS_MEMORIA, ORIGENS ou CANAIS exige migração
+// própria do CHECK (os nomes são explícitos por isso).
+export const DDL_A2 = `
+    CREATE TABLE IF NOT EXISTS memorias (
+      id           TEXT PRIMARY KEY,
+      texto        TEXT        NOT NULL CONSTRAINT memorias_texto_check CHECK (char_length(texto) BETWEEN 1 AND ${MEMORIA_TEXTO_MAX}),
+      status       TEXT        NOT NULL DEFAULT '${MEMORIA_ATIVA}' CONSTRAINT memorias_status_check CHECK (status IN (${listaSql(STATUS_MEMORIA)})),
+      lembrar_em   TEXT,
+      origem       TEXT        NOT NULL CONSTRAINT memorias_origem_check CHECK (origem IN (${listaSql(ORIGENS)})),
+      criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      arquivado_em TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS memorias_status_idx ON memorias (status, criado_em);
+
+    CREATE TABLE IF NOT EXISTS agente_turnos (
+      id           TEXT PRIMARY KEY,
+      canal        TEXT        NOT NULL CONSTRAINT agente_turnos_canal_check CHECK (canal IN (${listaSql(CANAIS)})),
+      sessao_id    TEXT,
+      status       TEXT        NOT NULL DEFAULT 'CONCLUIDO',
+      entrada      TEXT,
+      acoes        JSONB       NOT NULL DEFAULT '[]',
+      criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      concluido_em TIMESTAMPTZ,
+      desfeito_em  TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS agente_turnos_criado_idx ON agente_turnos (criado_em DESC);
+`;
+
 /**
  * Schema → seed → migrações de dado. Devolve o `estado` que o app precisa saber do banco:
  * {comentariosMigrados} — false quando a migração comentarios_v1 falhou (MIGRACAO_FALHOU no log),
@@ -143,6 +184,7 @@ export const DDL_A1 = `
 export async function initDB(db) {
   await db.query(DDL_BASE);
   await db.query(DDL_A1);
+  await db.query(DDL_A2);
 
   // Seed if empty (conta também as excluídas: excluir tudo não ressemeia o banco)
   const { rows } = await db.query("SELECT COUNT(*) FROM entries");

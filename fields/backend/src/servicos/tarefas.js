@@ -7,10 +7,12 @@
 import { v4 as uuidv4 } from "uuid";
 import { tx } from "../db/pool.js";
 import { sucesso, recusa } from "../lib/erros.js";
-import { toTask } from "./serializadores.js";
+import { tarefaDoAgente, toTask } from "./serializadores.js";
 import { registrar } from "./historico.js";
 import { excluirLogico, restaurarLogico } from "./exclusao.js";
-import { comentariosMigrados, executarLegado, logarLegado, planejarLegado } from "./comentarios.js";
+import { comentariosMigrados, executarLegado, legadosDe, logarLegado, planejarLegado } from "./comentarios.js";
+import { COLUNAS_KANBAN, COLUNA_FEITO, STATUS_CONCLUIDO } from "../dominio/enums.js";
+import { padraoContem, sqlSemAcento } from "../lib/texto.js";
 
 export const CAMPOS_EDITAVEIS_TAREFA = ["name", "acao", "status", "stakeholder", "deadline", "holder", "sort_order", "comments", "kanban_status", "start_date"];
 
@@ -27,8 +29,13 @@ const camposAuditados = (migrados) =>
 /**
  * Frente inexistente, excluída ou escondida por projeto excluído → 404 (até a A0: 500 da FK, ou
  * uma tarefa nascendo invisível). A frente fica travada (FOR SHARE) até o COMMIT.
+ *
+ * A2: aceita também kanban_status e start_date — a NovaTarefa do agente nasce na coluna e com o
+ * início pedidos num evento CRIADO só. Antes as duas chaves eram ignoradas no POST (a tarefa nascia
+ * em "A fazer" e o front movia com um PATCH); criar e depois editar gravaria dois eventos, e o
+ * desfazer da criação veria o segundo como "alguém mexeu depois".
  */
-export async function criarTarefa(db, ctx, frenteId, { name, acao = "", status = "Pendente", stakeholder = "", deadline = null, holder = "" } = {}) {
+export async function criarTarefa(db, ctx, frenteId, { name, acao = "", status = "Pendente", stakeholder = "", deadline = null, holder = "", kanban_status = COLUNAS_KANBAN[0], start_date = null } = {}) {
   if (!name) return recusa("NOME_OBRIGATORIO");
   const migrados = comentariosMigrados(ctx);
   const id = uuidv4();
@@ -40,8 +47,8 @@ export async function criarTarefa(db, ctx, frenteId, { name, acao = "", status =
     if (frente.length === 0) return recusa("NAO_ENCONTRADO");
     const { rows: cnt } = await c.query("SELECT COUNT(*) FROM tasks WHERE frente_id=$1", [frenteId]); // tabela-direta: só a ordem
     const { rows } = await c.query(
-      "INSERT INTO tasks (id, frente_id, name, acao, status, stakeholder, deadline, holder, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
-      [id, frenteId, name, acao, status, stakeholder, deadline, holder, parseInt(cnt[0]?.count) || 0]
+      "INSERT INTO tasks (id, frente_id, name, acao, status, stakeholder, deadline, holder, sort_order, kanban_status, start_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *",
+      [id, frenteId, name, acao, status, stakeholder, deadline, holder, parseInt(cnt[0]?.count) || 0, kanban_status ?? COLUNAS_KANBAN[0], start_date ?? null] // null explícito do POST não fura o NOT NULL
     );
     await registrar(c, ctx, { entidade_tipo: "TAREFA", entidade_id: id, acao: "CRIADO", depois: rows[0], campos: camposAuditados(migrados) });
     return sucesso(toTask(rows[0], migrados ? [] : undefined));
@@ -100,4 +107,63 @@ export async function excluirTarefa(db, ctx, id) {
 
 export async function restaurarTarefa(db, ctx, id) {
   return restaurarLogico(db, ctx, "TAREFA", id);
+}
+
+// ─── A2 · leituras do agente ───
+// Pelas views, como toda leitura de tarefa (a cascata lógica mora nelas), e com a frente e o
+// projeto juntos: o agente desambigua "tarefa › frente › projeto" pelo NOME.
+
+const SQL_TAREFA_COM_PAIS = `
+  SELECT t.*, f.name AS frente_nome, p.id AS projeto_id, p.name AS projeto_nome
+  FROM tarefas_visiveis t
+  JOIN frentes_visiveis f ON f.id = t.frente_id
+  JOIN projects p ON p.id = f.project_id`;
+
+// Prazo só conta quando é uma data ISO: a coluna é TEXT desde a A0, e um "15/10" digitado à mão
+// compararia como texto e cairia em "atrasada" para sempre.
+const PRAZO_ISO = "t.deadline ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'";
+
+/** A tarefa (visível) com frente, projeto e comentários. Excluída ou escondida → NAO_ENCONTRADO. */
+export async function obterTarefa(db, ctx, id) {
+  const { rows } = await db.query(`${SQL_TAREFA_COM_PAIS} WHERE t.id = $1`, [id]);
+  if (rows.length === 0) return recusa("NAO_ENCONTRADO");
+  const comentarios = await legadosDe(db, ctx, "TAREFA", [id]);
+  return sucesso({ ...tarefaDoAgente(rows[0]), comentarios: comentarios?.get(id) ?? rows[0].comments ?? [] });
+}
+
+/**
+ * Busca com filtros, todos opcionais. `abertas` = nem status Concluído nem coluna Feito (os dois
+ * eixos são independentes; arrastar para "Feito" na tela não muda o status, e uma tarefa assim não
+ * deve aparecer como atrasada). Sem filtro de status, as concluídas vêm por último.
+ */
+export async function buscarTarefas(db, _ctx, {
+  texto, projetoId, frenteId, status, coluna, prazoDe, prazoAte, atrasadasEm, abertas = false, limite = 30,
+} = {}) {
+  const where = [];
+  const params = [];
+  const p = (v) => { params.push(v); return `$${params.length}`; };
+
+  if (texto) {
+    const t = p(padraoContem(texto));
+    where.push(`(${sqlSemAcento("t.name")} LIKE ${t} OR ${sqlSemAcento("t.acao")} LIKE ${t} OR ${sqlSemAcento("t.stakeholder")} LIKE ${t})`);
+  }
+  if (projetoId) where.push(`p.id = ${p(projetoId)}`);
+  if (frenteId) where.push(`f.id = ${p(frenteId)}`);
+  if (status) where.push(`t.status = ${p(status)}`);
+  if (coluna) where.push(`t.kanban_status = ${p(coluna)}`);
+  if (prazoDe) where.push(`${PRAZO_ISO} AND t.deadline >= ${p(prazoDe)}`);
+  if (prazoAte) where.push(`${PRAZO_ISO} AND t.deadline <= ${p(prazoAte)}`);
+  if (atrasadasEm) where.push(`${PRAZO_ISO} AND t.deadline < ${p(atrasadasEm)}`);
+  if (abertas || atrasadasEm) {
+    where.push(`t.status <> ${p(STATUS_CONCLUIDO)} AND t.kanban_status <> ${p(COLUNA_FEITO)}`);
+  }
+
+  const concluida = `(t.status = ${p(STATUS_CONCLUIDO)})`;
+  const sql = `${SQL_TAREFA_COM_PAIS}
+    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+    ORDER BY ${concluida}, (CASE WHEN ${PRAZO_ISO} THEN t.deadline END) ASC NULLS LAST,
+             p.sort_order, f.sort_order, t.sort_order, t.created_at
+    LIMIT ${p(limite)}`;
+  const { rows } = await db.query(sql, params);
+  return rows.map(tarefaDoAgente);
 }

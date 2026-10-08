@@ -33,3 +33,49 @@ export function toEntry(row, threads) {
     updatedAt: row.updated_at,
   };
 }
+
+// ─── A2 · o formato que o AGENTE lê ───
+// Não é contrato de rota: é o que as ferramentas devolvem ao modelo (e ao MCP). Chaves em português,
+// e o id SEMPRE ao lado do nome — o modelo encadeia leitura → escrita pelo id, e o prompt proíbe
+// mostrá-lo; sem o id aqui, ele teria de perguntar ao Carlos, que é o que o prompt também proíbe.
+
+const vazioViraNull = (v) => (v === "" || v === undefined ? null : v);
+
+/** Linha de tarefa (com frente_nome, projeto_id e projeto_nome do JOIN) → tarefa do agente. */
+export function tarefaDoAgente(r) {
+  return {
+    tarefa_id: r.id, nome: r.name, acao: vazioViraNull(r.acao),
+    status: r.status, coluna: r.kanban_status,
+    prazo: vazioViraNull(r.deadline), inicio: vazioViraNull(r.start_date),
+    holder: r.holder, stakeholder: vazioViraNull(r.stakeholder),
+    frente_id: r.frente_id, frente: r.frente_nome ?? null,
+    projeto_id: r.projeto_id ?? null, projeto: r.projeto_nome ?? null,
+  };
+}
+
+/** Linha de entries → entrada do agente. O conteúdo vai como trecho: a lista é para escolher. */
+export function entradaDoAgente(r) {
+  const conteudo = r.content ?? "";
+  return {
+    entrada_id: r.id, tipo: r.type, titulo: r.title,
+    data: vazioViraNull(r.date), hora: vazioViraNull(r.time),
+    tags: r.tags ?? [], fixada: Boolean(r.pinned),
+    trecho: conteudo.length > 200 ? `${conteudo.slice(0, 200)}…` : conteudo,
+  };
+}
+
+/** Reunião no formato da API (toMeeting) → reunião do agente. */
+export function reuniaoDoAgente(m) {
+  return {
+    reuniao_id: m.id, titulo: m.title, data: m.date,
+    inicio: vazioViraNull(m.startTime), fim: vazioViraNull(m.endTime),
+    pauta: vazioViraNull(m.description), must: vazioViraNull(m.must),
+  };
+}
+
+/** Array legado de comentários ({text, createdAt|created_at}) → [{texto, criado_em}]. */
+export function comentariosDoAgente(lista) {
+  return (Array.isArray(lista) ? lista : []).map((c) => ({
+    texto: c?.text ?? "", criado_em: c?.createdAt ?? c?.created_at ?? null,
+  }));
+}

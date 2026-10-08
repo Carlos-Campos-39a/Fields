@@ -111,3 +111,11 @@ export async function excluirReuniao(db, ctx, id) {
 export async function restaurarReuniao(db, ctx, id) {
   return restaurarLogico(db, ctx, "REUNIAO", id);
 }
+
+/** A2 · a reunião viva no formato da API (com os comentários). Excluída ou inexistente → NAO_ENCONTRADO. */
+export async function obterReuniao(db, ctx, id) {
+  const { rows } = await db.query("SELECT * FROM meetings WHERE id = $1 AND deleted_at IS NULL", [id]);
+  if (rows.length === 0) return recusa("NAO_ENCONTRADO");
+  const [meeting] = await serializar(db, ctx, rows);
+  return sucesso(meeting);
+}

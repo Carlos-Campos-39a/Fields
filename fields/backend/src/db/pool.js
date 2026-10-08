@@ -47,3 +47,47 @@ export async function tx(db, fn) {
     cliente.release(quebrado);
   }
 }
+
+// Carrega a recusa para fora do tx: lançar é o que faz o tx() dar ROLLBACK.
+class RecusaNaTransacao extends Error {
+  constructor(resultado) {
+    super("recusa dentro da transação");
+    this.name = "RecusaNaTransacao";
+    this.resultado = resultado;
+  }
+}
+
+/**
+ * Como tx(), mas uma RECUSA (fn devolve {ok:false, ...}) também volta atrás — e é devolvida, não
+ * lançada. É o que o agente precisa: uma operação composta (ler o alvo, escrever, anotar a ação no
+ * turno) em que a segunda etapa recusa não pode deixar a primeira gravada. Os serviços da A1
+ * recusam ANTES de escrever, então hoje isso só muda alguma coisa quando há composição — e é
+ * justamente aí que um "deu meio certo" seria impossível de explicar.
+ *
+ * Com `db` já sendo um cliente emprestado (tx aninhada), a unidade é um SAVEPOINT: a recusa desfaz
+ * só o que esta chamada escreveu, e a transação de fora segue.
+ */
+export async function txOuRecusa(db, fn) {
+  if (typeof db.release === "function") {
+    await db.query("SAVEPOINT tx_ou_recusa");
+    let resultado;
+    try {
+      resultado = await fn(db);
+    } catch (err) {
+      await db.query("ROLLBACK TO SAVEPOINT tx_ou_recusa").catch(() => {});
+      throw err;
+    }
+    await db.query(resultado?.ok === false ? "ROLLBACK TO SAVEPOINT tx_ou_recusa" : "RELEASE SAVEPOINT tx_ou_recusa");
+    return resultado;
+  }
+  try {
+    return await tx(db, async (cliente) => {
+      const resultado = await fn(cliente);
+      if (resultado?.ok === false) throw new RecusaNaTransacao(resultado);
+      return resultado;
+    });
+  } catch (err) {
+    if (err instanceof RecusaNaTransacao) return err.resultado;
+    throw err;
+  }
+}
