@@ -117,7 +117,10 @@ export const NODES = {
     `prazo e inicio (AAAA-MM-DD), stakeholder (quem pediu ou depende), holder (${lista(HOLDERS)}).`,
   Reuniao: "compromisso na agenda semanal. titulo, data (AAAA-MM-DD), inicio e fim (HH:MM), pauta, " +
     "must (o que não pode sair da reunião sem ser tratado).",
-  Comentario: "nota curta sobre uma entrada, tarefa ou reunião; só se acrescenta, em ordem.",
+  // Não se edita, mas sai e volta como os outros registros (A2c). Sem nome de ferramenta aqui: NODES
+  // vai ao prompt também no modo somente leitura.
+  Comentario: "nota curta sobre uma entrada, tarefa ou reunião, em ordem de criação. Não se edita; " +
+    "se exclui e se restaura como os outros registros.",
   Memoria: `algo que o Carlos PEDIU para você lembrar (até ${MEMORIAS_ATIVAS_MAX} ativas, ` +
     `${MEMORIA_TEXTO_MAX} caracteres cada). texto, lembrar_em opcional (a partir de quando importa).`,
 };
@@ -129,7 +132,7 @@ export const RELATIONSHIPS = [
   // excluir um projeto por engano — ou de concluir que as tarefas sumiram para sempre.
   "(Projeto)-[:TEM_FRENTE]->(Frente)   # excluir o projeto esconde as frentes e as tarefas; restaurar devolve a árvore inteira",
   "(Frente)-[:TEM_TAREFA]->(Tarefa)   # excluir a frente esconde as tarefas dela; restaurar devolve",
-  "(Comentario)-[:SOBRE]->(Entrada|Tarefa|Reuniao)",
+  "(Comentario)-[:SOBRE]->(Entrada|Tarefa|Reuniao)   # excluir o alvo esconde os comentários dele; restaurar o alvo devolve",
   "(Entrada)-[:COMPARTILHA_TAG]-(Entrada)   # as \"relacionadas\" da tela: uma tag em comum basta",
 ];
 
@@ -177,6 +180,11 @@ const _OPS_BASE = [
     resumo: "Consultar reunião — uma reunião inteira: pauta, must e comentários." },
   { name: "HistoricoEntidade", tipo: "READ",
     resumo: "Histórico — quem mudou o quê numa entrada, projeto, frente, tarefa, reunião ou comentário, e por onde (web, whatsapp, mcp)." },
+  // A2c. O caminho de volta que não depende da janela do desfazer nem do canal: o que foi excluído
+  // ontem, pela tela ou por outro assistente, se acha aqui. Sem nome de escrita no resumo — esta
+  // linha fica no prompt também com AGENTE_SOMENTE_LEITURA.
+  { name: "Lixeira", tipo: "READ",
+    resumo: "Lixeira — o que foi excluído nos últimos dias (30, por padrão): entradas, projetos, frentes, tarefas, reuniões e comentários, COM os ids e o contexto. Use para achar o que trazer de volta." },
 
   // ── Escrita ──
   { name: "NovaEntrada", tipo: "WRITE", confirmacao: "auto", acao: "NOVA_ENTRADA",
@@ -185,18 +193,26 @@ const _OPS_BASE = [
     resumo: "Editar entrada — mudar tipo, título, conteúdo, tags, data, hora, ou fixar/desafixar; preserva o histórico." },
   { name: "ExcluirEntrada", tipo: "WRITE", confirmacao: "auto", acao: "EXCLUIR_ENTRADA",
     resumo: "Excluir entrada — tirar uma entrada criada por engano." },
+  // A2c: cada Restaurar* logo depois do Excluir* do mesmo tipo — a ordem é a do prompt e do catálogo
+  // do MCP, e o par lido lado a lado é o que o modelo usa (o _voltaNoMcp casa pelo código `acao`).
+  { name: "RestaurarEntrada", tipo: "WRITE", confirmacao: "auto", acao: "RESTAURAR_ENTRADA",
+    resumo: "Restaurar entrada — trazer de volta uma entrada excluída (ache na Lixeira)." },
   { name: "NovoProjeto", tipo: "WRITE", confirmacao: "auto", acao: "NOVO_PROJETO",
     resumo: "Novo projeto — criar um projeto." },
   { name: "EditarProjeto", tipo: "WRITE", confirmacao: "auto", acao: "EDITAR_PROJETO",
     resumo: "Editar projeto — mudar nome, status ou holder; preserva o histórico." },
   { name: "ExcluirProjeto", tipo: "WRITE", confirmacao: "auto", acao: "EXCLUIR_PROJETO",
     resumo: "Excluir projeto — esconde o projeto junto com as frentes e as tarefas dele." },
+  { name: "RestaurarProjeto", tipo: "WRITE", confirmacao: "auto", acao: "RESTAURAR_PROJETO",
+    resumo: "Restaurar projeto — trazer de volta um projeto excluído, com as frentes e as tarefas que ele escondia." },
   { name: "NovaFrente", tipo: "WRITE", confirmacao: "auto", acao: "NOVA_FRENTE",
     resumo: "Nova frente — criar uma frente num projeto." },
   { name: "EditarFrente", tipo: "WRITE", confirmacao: "auto", acao: "EDITAR_FRENTE",
     resumo: "Editar frente — renomear uma frente." },
   { name: "ExcluirFrente", tipo: "WRITE", confirmacao: "auto", acao: "EXCLUIR_FRENTE",
     resumo: "Excluir frente — esconde a frente junto com as tarefas dela." },
+  { name: "RestaurarFrente", tipo: "WRITE", confirmacao: "auto", acao: "RESTAURAR_FRENTE",
+    resumo: "Restaurar frente — trazer de volta uma frente excluída, com as tarefas dela; com o projeto também excluído, restaure o projeto antes." },
   { name: "NovaTarefa", tipo: "WRITE", confirmacao: "auto", acao: "NOVA_TAREFA",
     resumo: "Nova tarefa — criar uma tarefa numa frente, já com prazo, coluna, status ou holder se foram ditos." },
   { name: "EditarTarefa", tipo: "WRITE", confirmacao: "auto", acao: "EDITAR_TAREFA",
@@ -205,14 +221,22 @@ const _OPS_BASE = [
     resumo: "Concluir tarefa — status Concluído E coluna Feito, de uma vez." },
   { name: "ExcluirTarefa", tipo: "WRITE", confirmacao: "auto", acao: "EXCLUIR_TAREFA",
     resumo: "Excluir tarefa — tirar uma tarefa criada por engano." },
+  { name: "RestaurarTarefa", tipo: "WRITE", confirmacao: "auto", acao: "RESTAURAR_TAREFA",
+    resumo: "Restaurar tarefa — trazer de volta uma tarefa excluída; com a frente ou o projeto também excluído, restaure-o antes." },
   { name: "NovaReuniao", tipo: "WRITE", confirmacao: "auto", acao: "NOVA_REUNIAO",
     resumo: "Nova reunião — marcar uma reunião na agenda." },
   { name: "EditarReuniao", tipo: "WRITE", confirmacao: "auto", acao: "EDITAR_REUNIAO",
     resumo: "Editar reunião — mudar título, data, horário, pauta ou must; preserva o histórico." },
   { name: "ExcluirReuniao", tipo: "WRITE", confirmacao: "auto", acao: "EXCLUIR_REUNIAO",
     resumo: "Excluir reunião — tirar uma reunião da agenda." },
+  { name: "RestaurarReuniao", tipo: "WRITE", confirmacao: "auto", acao: "RESTAURAR_REUNIAO",
+    resumo: "Restaurar reunião — trazer de volta uma reunião excluída." },
   { name: "NovoComentario", tipo: "WRITE", confirmacao: "auto", acao: "NOVO_COMENTARIO",
     resumo: "Novo comentário — comentar numa entrada, tarefa ou reunião." },
+  { name: "ExcluirComentario", tipo: "WRITE", confirmacao: "auto", acao: "EXCLUIR_COMENTARIO",
+    resumo: "Excluir comentário — tirar um comentário escrito por engano (o comentario_id vem na consulta da entrada, da tarefa ou da reunião)." },
+  { name: "RestaurarComentario", tipo: "WRITE", confirmacao: "auto", acao: "RESTAURAR_COMENTARIO",
+    resumo: "Restaurar comentário — trazer de volta um comentário excluído (ache na Lixeira)." },
   // ── A memória: as duas únicas escritas que não tocam dado de trabalho ──
   // Sem inverso (desfazer.js): desfazer é pedir de novo, numa frase. E SÓ quando o Carlos pede — a
   // lista entra em todo turno, e enchê-la de inferências do modelo afoga o que ele pediu de fato.
@@ -287,12 +311,14 @@ export const CONFIRMACAO_HUMANA = OPERATIONS
 // Depende também do CANAL, porque a volta depende dele: na tela e no WhatsApp o desfazer do turno
 // (POST /api/agente/desfazer) está a um gesto; no MCP não está — o cliente não tem botão nem
 // "desfazer", só as operações do catálogo. Prometer "pode desfazer" ali é a promessa vazia que o
-// modelo repassa ao Carlos como garantia.
+// modelo repassa ao Carlos como garantia. Desde a A2c a exclusão também tem operação inversa
+// (Restaurar*), então no MCP a volta é sempre "outra operação" — e o que nem isso tem está nomeado
+// no sufixo do canal.
 const VOLTA_NO_CANAL = {
   web: "Toda escrita executa na hora e o Carlos pode desfazê-la logo depois.",
   whatsapp: "Toda escrita executa na hora e o Carlos pode desfazê-la logo depois.",
-  mcp: "Toda escrita executa na hora, e por este canal não há desfazer: o que foi criado ou " +
-    "editado se corrige com outra operação, e uma exclusão não tem volta (veja abaixo).",
+  mcp: "Toda escrita executa na hora, e por este canal não há desfazer: o que foi criado, editado " +
+    "ou excluído se corrige com a operação inversa (veja abaixo).",
 };
 
 export function limitesDoCanal(canal, operacoes = OPERATIONS) {
@@ -338,33 +364,51 @@ export function _blocoDeMemoria(memorias) {
 // ── A volta pelo MCP, derivada da própria ontologia ──────────────────────────
 //
 // O cliente MCP não chama o POST /api/agente/desfazer (não há operação de desfazer na ontologia, por
-// decisão) e a tela ainda não restaura o que foi excluído por fora dela. Então a volta, ali, é só o
-// que o CATÁLOGO alcança: a criação se corrige com a exclusão do mesmo tipo, a edição com o editor e
-// os valores `de` do HistoricoEntidade — e o resto não tem volta: a exclusão (não há Restaurar* no
-// catálogo) e a criação sem exclusão correspondente (NovoComentario: não há ExcluirComentario).
+// decisão). Então a volta, ali, é só o que o CATÁLOGO alcança: a criação se corrige com a exclusão do
+// mesmo tipo; a exclusão com o Restaurar* do mesmo tipo, e o restaurar com a exclusão de novo (o par
+// EXCLUIR_* ↔ RESTAURAR_*, desde a A2c); a edição com o editor e os valores `de` do
+// HistoricoEntidade. Sem volta fica o que não tem operação inversa nenhuma — hoje, a memória
+// (Lembrar/Esquecer), que é `null` em INVERSOS pelo mesmo motivo do CRM.
 //
-// Os pares saem dos códigos `acao` (NOVA_TAREFA ↔ EXCLUIR_TAREFA), não de uma lista escrita aqui:
-// uma escrita nova entra no texto sozinha. ontologia.js não importa desfazer.js (que importa os
-// serviços), então quem confere este par contra INVERSOS/ALVO_DA_ESCRITA — a autoridade — é o
+// Os pares saem dos códigos `acao` (NOVA_TAREFA → EXCLUIR_TAREFA ↔ RESTAURAR_TAREFA), não de uma
+// lista escrita aqui: uma escrita nova entra no texto sozinha — e uma que não se encaixe em verbo
+// nenhum cai em "sem volta", o lado seguro do erro. ontologia.js não importa desfazer.js (que importa
+// os serviços), então quem confere tudo isto contra INVERSOS/ALVO_DA_ESCRITA — a autoridade — é o
 // teste reflexivo (test/ontologia.test.js).
-const entidadeDaAcao = (acao, verbo) => {
-  const m = new RegExp(`^(?:${verbo})_([A-Z_]+)$`).exec(acao ?? "");
-  return m ? m[1] : null;
+//
+// A operação inversa de cada VERBO, sobre a MESMA entidade (NOVA_TAREFA → EXCLUIR_TAREFA).
+// EDITAR/CONCLUIR voltam pelo editor do tipo: entram aqui só para não caírem em "sem volta" (a frase
+// do editor é genérica, não lista pares).
+const VOLTA_DO_VERBO = Object.freeze({
+  NOVA: "EXCLUIR", NOVO: "EXCLUIR", RESTAURAR: "EXCLUIR", EXCLUIR: "RESTAURAR",
+  EDITAR: "EDITAR", CONCLUIR: "EDITAR",
+});
+
+const verboEEntidade = (acao) => {
+  const m = /^([A-Z]+)(?:_([A-Z_]+))?$/.exec(acao ?? "");
+  return m ? { verbo: m[1], entidade: m[2] ?? null } : { verbo: null, entidade: null };
 };
 
-/** {pares:["NovaTarefa → ExcluirTarefa", …], semVolta:["ExcluirEntrada", …, "NovoComentario"]}. */
+/**
+ * {pares:["NovaTarefa → ExcluirTarefa", …], exclusoes:["ExcluirTarefa ↔ RestaurarTarefa", …],
+ *  semVolta:["Lembrar", "Esquecer"]}.
+ */
 export function _voltaNoMcp(operacoes = OPERATIONS) {
   const escritas = operacoes.filter((op) => op.tipo === "WRITE");
-  const exclusaoDe = new Map(
-    escritas.map((op) => [entidadeDaAcao(op.acao, "EXCLUIR"), op.name]).filter(([entidade]) => entidade)
-  );
-  const criacoes = escritas
-    .map((op) => [op.name, entidadeDaAcao(op.acao, "NOVA|NOVO")])
-    .filter(([, entidade]) => entidade);
-  return {
-    pares: criacoes.filter(([, e]) => exclusaoDe.has(e)).map(([nome, e]) => `${nome} → ${exclusaoDe.get(e)}`),
-    semVolta: [...exclusaoDe.values(), ...criacoes.filter(([, e]) => !exclusaoDe.has(e)).map(([nome]) => nome)],
-  };
+  const nomePorAcao = new Map(escritas.map((op) => [op.acao, op.name]));
+  const pares = [];
+  const exclusoes = [];
+  const semVolta = [];
+  for (const op of escritas) {
+    const { verbo, entidade } = verboEEntidade(op.acao);
+    const inverso = VOLTA_DO_VERBO[verbo];
+    const volta = entidade && inverso ? nomePorAcao.get(`${inverso}_${entidade}`) : undefined;
+    if (!volta) semVolta.push(op.name);
+    else if (verbo === "NOVA" || verbo === "NOVO") pares.push(`${op.name} → ${volta}`);
+    else if (verbo === "EXCLUIR") exclusoes.push(`${op.name} ↔ ${volta}`);
+    // RESTAURAR já entrou no par do EXCLUIR do mesmo tipo; EDITAR/CONCLUIR, na frase do editor.
+  }
+  return { pares, exclusoes, semVolta };
 }
 
 // MCP: quem lê é outro assistente, que vai reescrever a resposta para o Carlos. Markdown passa.
@@ -372,20 +416,29 @@ export function _voltaNoMcp(operacoes = OPERATIONS) {
 // Sem escrita ligada (AGENTE_SOMENTE_LEITURA), as linhas de volta, de exclusão e de memória somem:
 // falar de como desfazer o que não se pode fazer convida o modelo a tentar.
 //
-// A exclusão é a que esconde uma árvore inteira e não tem volta aqui; por isso ela vira pergunta
-// ANTES — a exceção ao "não peça licença" — até existir Restaurar* ou uma tela de restaurar.
+// A exclusão continua sendo a pergunta ANTES — a exceção ao "não peça licença" —, mesmo com volta
+// (Restaurar*): o erro dela é o que ninguém vê. Excluir o alvo errado o tira da tela (num projeto, a
+// árvore inteira), a resposta diz "excluí a tarefa X" com o nome que o modelo achou, e a volta pela
+// Lixeira só acontece se alguém notar o que sumiu.
 function sufixoMcp(operacoes) {
   const forma = "\n- Quem lê esta resposta é outro assistente (Claude Desktop, Code ou Cowork), não o " +
     "Carlos direto: markdown liberado, e seja completo no que importa para ele repassar.";
   if (!operacoes.some((op) => op.tipo === "WRITE")) return forma;
-  const { pares, semVolta } = _voltaNoMcp(operacoes);
+  const { pares, exclusoes, semVolta } = _voltaNoMcp(operacoes);
   return forma + "\n" +
-    "- Voltar atrás neste canal: o que foi CRIADO se desfaz com a exclusão do mesmo tipo (" +
-    pares.join(", ") + "); o que foi EDITADO volta com a ferramenta de edição e os valores " +
-    "anteriores (veja HistoricoEntidade). Estas NÃO têm volta por este canal: " + semVolta.join(", ") +
-    " — nunca diga ao Carlos que dá para desfazê-las.\n" +
-    "- Por isso a exclusão é a exceção ao 'não peça licença': antes de chamar um Excluir*, confirme " +
-    "com o Carlos o alvo pelo NOME (\"tarefa › frente › projeto\"), dizendo que não há volta.\n" +
+    "- Voltar atrás neste canal é chamar a operação inversa: o que foi CRIADO sai com a exclusão do " +
+    "mesmo tipo (" + pares.join(", ") + "); o que foi EXCLUÍDO volta com a restauração do mesmo " +
+    "tipo, e o que foi restaurado sai de novo com a exclusão (" + exclusoes.join(", ") + "); o que " +
+    "foi EDITADO volta com a ferramenta de edição e os valores anteriores (veja HistoricoEntidade). " +
+    "Uma exclusão de outro dia se acha na Lixeira.\n" +
+    (semVolta.length
+      ? "- Estas NÃO têm volta por este canal: " + semVolta.join(", ") +
+        " — nunca diga ao Carlos que dá para desfazê-las.\n"
+      : "") +
+    "- A exclusão é a exceção ao 'não peça licença': antes de chamar um Excluir*, confirme com o " +
+    "Carlos o alvo pelo NOME (\"tarefa › frente › projeto\"). Excluir o alvo errado o tira da tela " +
+    "— num projeto, a árvore inteira — sem que ninguém perceba lendo a resposta, e a volta só " +
+    "acontece se alguém notar o que sumiu.\n" +
     "- A memória (o que o Carlos pediu para lembrar) não é visível neste canal: Lembrar e Esquecer " +
     "funcionam, e valem para o assistente da tela e do WhatsApp, mas você não lê a lista. Se a " +
     "memória estiver cheia, pergunte ao Carlos qual linha pode sair e passe ao Esquecer o trecho " +
@@ -529,7 +582,13 @@ export function systemPrompt({ canal, operacoes = OPERATIONS, confirmacaoHumana 
     (escreve
       ? "- CONCLUIR uma tarefa = ConcluirTarefa, que move os dois eixos. Nunca exclua e recrie, e não " +
         "mova só o status ou só a coluna para dizer que concluiu.\n" +
-        "- MEMÓRIA: use Lembrar só quando ele pedir explicitamente que você lembre de algo.\n"
+        "- MEMÓRIA: use Lembrar só quando ele pedir explicitamente que você lembre de algo.\n" +
+        // A2c: o caminho de volta que não depende da janela do desfazer nem do canal da exclusão.
+        // O `pai` primeiro porque restaurar o filho de um pai excluído é recusado (PAI_EXCLUIDO), e
+        // porque o projeto devolve sozinho o que só estava escondido por ele.
+        "- TRAZER DE VOLTA algo excluído antes (em outro turno, pela tela ou por outro canal): " +
+        "Lixeira → Restaurar* do mesmo tipo. Com pai_excluido, restaure antes o `pai` indicado — " +
+        "restaurar um projeto já devolve as frentes e as tarefas que ele escondia.\n"
       : "") +
     (escreve ? "- Não existe ferramenta de desfazer. " + DESFAZER_NO_CANAL[canal] + "\n" : "") +
     // ── COMO FALAR. Proibições NOMEADAS em vez de um adjetivo: "seja conciso" não vale nada — o

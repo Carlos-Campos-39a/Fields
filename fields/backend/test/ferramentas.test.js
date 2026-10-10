@@ -243,6 +243,14 @@ test("resumoAcao: uma frase no passado, com nomes e rótulos — nunca id nem en
     ["ExcluirProjeto", { projeto_id: "p1" }, { projeto_id: "p1", nome: "TCC" }, "Excluiu o projeto “TCC”, com as frentes e tarefas dele"],
     ["NovaReuniao", {}, { reuniao_id: "r1", titulo: "Banca", data: "2026-10-10", inicio: "10:00" }, "Marcou a reunião “Banca” para 10/10 às 10:00"],
     ["NovoComentario", {}, { comentario_id: "c1", alvo_tipo: "REUNIAO", alvo_nome: "Banca" }, "Comentou na reunião “Banca”"],
+    // A2c: as escritas novas, cada uma com a sua frase.
+    ["ExcluirComentario", { comentario_id: "c1" }, { comentario_id: "c1", alvo_tipo: "TAREFA", alvo_nome: "Deck" }, "Excluiu um comentário da tarefa “Deck”"],
+    ["RestaurarComentario", { comentario_id: "c1" }, { comentario_id: "c1", alvo_tipo: "ENTRADA", alvo_nome: "Ideia" }, "Restaurou um comentário da nota “Ideia”"],
+    ["RestaurarEntrada", { entrada_id: "e1" }, { entrada_id: "e1", tipo: "reminder", titulo: "Pagar boleto" }, "Restaurou o lembrete “Pagar boleto”"],
+    ["RestaurarProjeto", { projeto_id: "p1" }, { projeto_id: "p1", nome: "TCC" }, "Restaurou o projeto “TCC”, com as frentes e tarefas dele"],
+    ["RestaurarFrente", { frente_id: "a1b2c3" }, { frente_id: "a1b2c3", nome: "Cobrança", projeto: "McKinsey" }, "Restaurou a frente “Cobrança”, com as tarefas dela"],
+    ["RestaurarTarefa", { tarefa_id: "t9" }, { tarefa_id: "t9", nome: "Deck" }, "Restaurou a tarefa “Deck”"],
+    ["RestaurarReuniao", { reuniao_id: "r1" }, { reuniao_id: "r1", titulo: "Banca", data: "2026-10-10" }, "Restaurou a reunião “Banca”"],
     ["Lembrar", {}, { memoria_id: "m1", texto: "a Ana só atende de manhã", lembrar_em: null }, "Guardou na memória: “a Ana só atende de manhã”"],
     ["Esquecer", {}, { memoria_id: "m1", texto: "a Ana só atende de manhã" }, "Tirou da memória: “a Ana só atende de manhã”"],
   ];

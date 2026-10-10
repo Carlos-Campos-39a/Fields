@@ -116,6 +116,22 @@ const HistoricoEntidade = z.strictObject({
   "onde (web, whatsapp, mcp, agente). Responde 'quem mudou isso?' e 'como era antes?'."
 );
 
+// A2c. Sem nome de escrita na descrição: com AGENTE_SOMENTE_LEITURA esta leitura continua no
+// catálogo, e citar uma ferramenta desligada é convidar o modelo a chamá-la.
+const Lixeira = z.strictObject({
+  tipo: z.enum([...ENTIDADES]).describe("Só itens deste tipo. Omita para todos.").optional(),
+  desde_dias: z.number().int().min(1).max(365).default(30)
+    .describe("Quantos dias para trás olhar, pela data da exclusão (1 a 365; padrão 30)."),
+  limite: limite(50, 30).optional(),
+}).describe(
+  "O que foi excluído nos últimos dias, do mais recente ao mais antigo: entradas, projetos, frentes, " +
+  "tarefas, reuniões e comentários, cada um COM o id (entrada_id, projeto_id, frente_id, tarefa_id, " +
+  "reuniao_id, comentario_id), o nome ou título, excluido_em e o contexto (projeto › frente; o alvo " +
+  "do comentário). `pai_excluido: true` = o item está dentro de algo também excluído, e o `pai` é o " +
+  "que tem de voltar antes. Frentes e tarefas que só sumiram porque o projeto (ou a frente) foi " +
+  "excluído NÃO aparecem: elas voltam junto com ele."
+);
+
 // ── Escrita ───────────────────────────────────────────────────────────────────
 // Edição: todo campo é opcional menos o id — envie SÓ o que muda. Ausente é "não mexa"; null (onde
 // é aceito) é "apague o valor". Os MAPAS abaixo dizem em que coluna cada argumento cai, e é deles
@@ -152,6 +168,13 @@ const ExcluirEntrada = z.strictObject({
   entrada_id: id("Id da entrada a excluir."),
 }).describe("Exclui uma entrada criada por engano (exclusão lógica: o Carlos pode restaurar).");
 
+// ── Restaurar* (A2c) ──
+// O id vem da Lixeira, que diz também se o item está dentro de algo excluído (pai_excluido): aí a
+// recusa é PAI_EXCLUIDO, com o `pai` a restaurar antes — nunca um "restaurei" que segue escondido.
+const RestaurarEntrada = z.strictObject({
+  entrada_id: id("Id da entrada excluída (descubra com Lixeira)."),
+}).describe("Traz de volta uma entrada excluída, com os comentários dela.");
+
 const NovoProjeto = z.strictObject({
   nome: texto("Nome do projeto."),
   status: status.describe("Status inicial (padrão: Em andamento).").optional(),
@@ -172,6 +195,13 @@ const ExcluirProjeto = z.strictObject({
   "o projeto devolve a árvore inteira)."
 );
 
+const RestaurarProjeto = z.strictObject({
+  projeto_id: id("Id do projeto excluído (descubra com Lixeira)."),
+}).describe(
+  "Traz de volta um projeto excluído — e com ele as frentes e as tarefas que só estavam escondidas " +
+  "por ele. As que tinham sido excluídas uma a uma antes continuam na Lixeira."
+);
+
 const NovaFrente = z.strictObject({
   projeto_id: id("Id do projeto (descubra com ListarProjetos)."),
   nome: texto("Nome da frente."),
@@ -185,6 +215,13 @@ const EditarFrente = z.strictObject({
 const ExcluirFrente = z.strictObject({
   frente_id: id("Id da frente a excluir."),
 }).describe("Exclui uma frente — e com ela somem da tela as tarefas dela (restaurar devolve).");
+
+const RestaurarFrente = z.strictObject({
+  frente_id: id("Id da frente excluída (descubra com Lixeira)."),
+}).describe(
+  "Traz de volta uma frente excluída, com as tarefas que ela escondia. Com o projeto dela também " +
+  "excluído, recusa com PAI_EXCLUIDO: restaure antes o `pai` indicado."
+);
 
 const NovaTarefa = z.strictObject({
   frente_id: id("Id da frente onde a tarefa nasce (descubra com ListarProjetos)."),
@@ -225,6 +262,13 @@ const ExcluirTarefa = z.strictObject({
   tarefa_id: id("Id da tarefa a excluir."),
 }).describe("Exclui uma tarefa criada por engano (exclusão lógica). Para tarefa terminada, use ConcluirTarefa.");
 
+const RestaurarTarefa = z.strictObject({
+  tarefa_id: id("Id da tarefa excluída (descubra com Lixeira)."),
+}).describe(
+  "Traz de volta uma tarefa excluída, com os comentários dela. Com a frente ou o projeto dela também " +
+  "excluído, recusa com PAI_EXCLUIDO: restaure antes o `pai` indicado."
+);
+
 const NovaReuniao = z.strictObject({
   titulo: texto("Título da reunião."),
   data: data("Dia da reunião."),
@@ -248,11 +292,28 @@ const ExcluirReuniao = z.strictObject({
   reuniao_id: id("Id da reunião a excluir."),
 }).describe("Tira uma reunião da agenda (exclusão lógica).");
 
+const RestaurarReuniao = z.strictObject({
+  reuniao_id: id("Id da reunião excluída (descubra com Lixeira)."),
+}).describe("Traz de volta uma reunião excluída, com os comentários dela.");
+
 const NovoComentario = z.strictObject({
   alvo_tipo: z.enum([...ALVOS_COMENTARIO]).describe("Onde comentar: ENTRADA, TAREFA ou REUNIAO."),
   alvo_id: id("Id da entrada, tarefa ou reunião."),
   texto: z.string().min(1).max(COMENTARIO_TEXTO_MAX).describe(`O comentário (até ${COMENTARIO_TEXTO_MAX} caracteres).`),
 }).describe("Acrescenta um comentário a uma entrada, tarefa ou reunião.");
+
+// O id do comentário vem nas consultas do alvo (cada comentário traz o comentario_id): sem ele, o
+// modelo teria de perguntar ao Carlos — o que o prompt proíbe.
+const ExcluirComentario = z.strictObject({
+  comentario_id: id("Id do comentário (vem em ConsultarTarefa, ConsultarEntrada ou ConsultarReuniao)."),
+}).describe("Exclui um comentário escrito por engano (exclusão lógica: volta com RestaurarComentario).");
+
+const RestaurarComentario = z.strictObject({
+  comentario_id: id("Id do comentário excluído (descubra com Lixeira)."),
+}).describe(
+  "Traz de volta um comentário excluído. Com o alvo dele (ou o que esconde o alvo) também excluído, " +
+  "recusa com PAI_EXCLUIDO: restaure antes o `pai` indicado."
+);
 
 const Lembrar = z.strictObject({
   texto: z.string().min(1).max(MEMORIA_TEXTO_MAX)
@@ -270,13 +331,13 @@ const Esquecer = z.strictObject({
 
 export const SCHEMAS = {
   ResumoDoDia, ProximosCompromissos, BuscarEntradas, ConsultarEntrada, ListarProjetos,
-  BuscarTarefas, ConsultarTarefa, ListarReunioes, ConsultarReuniao, HistoricoEntidade,
-  NovaEntrada, EditarEntrada, ExcluirEntrada,
-  NovoProjeto, EditarProjeto, ExcluirProjeto,
-  NovaFrente, EditarFrente, ExcluirFrente,
-  NovaTarefa, EditarTarefa, ConcluirTarefa, ExcluirTarefa,
-  NovaReuniao, EditarReuniao, ExcluirReuniao,
-  NovoComentario, Lembrar, Esquecer,
+  BuscarTarefas, ConsultarTarefa, ListarReunioes, ConsultarReuniao, HistoricoEntidade, Lixeira,
+  NovaEntrada, EditarEntrada, ExcluirEntrada, RestaurarEntrada,
+  NovoProjeto, EditarProjeto, ExcluirProjeto, RestaurarProjeto,
+  NovaFrente, EditarFrente, ExcluirFrente, RestaurarFrente,
+  NovaTarefa, EditarTarefa, ConcluirTarefa, ExcluirTarefa, RestaurarTarefa,
+  NovaReuniao, EditarReuniao, ExcluirReuniao, RestaurarReuniao,
+  NovoComentario, ExcluirComentario, RestaurarComentario, Lembrar, Esquecer,
 };
 
 // ── Argumento → coluna, por ferramenta de edição ──────────────────────────────

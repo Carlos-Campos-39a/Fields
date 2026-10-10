@@ -13,8 +13,10 @@
  *                   defasado do backend implantado no Railway);
  *   - tools/call  → `POST /api/ops/:name`, o mesmo `executeRead`/`executeWrite` do agente, que grava
  *                   o `historico` com `origem:'mcp'`. A escrita executa na hora e não há desfazer por
- *                   este canal: criação e edição se corrigem com outra operação, exclusão não tem
- *                   volta (o prompt do canal `mcp` diz quais, e manda confirmar antes de excluir);
+ *                   este canal: a volta é a operação inversa — criação → Excluir*, edição → o editor
+ *                   com os valores anteriores, exclusão → Lixeira + Restaurar* (desde a A2c). O que
+ *                   nem isso tem (a memória) o prompt do canal `mcp` nomeia, e ele manda confirmar o
+ *                   alvo antes de excluir;
  *   - resources   → `fields://ontologia` (o texto do prompt do canal `mcp`) e `fields://resumo-do-dia`;
  *   - prompts     → `assistente-fields`, o system prompt do canal `mcp`: Desktop, Code e Cowork agem
  *                   com o mesmo COMO AGIR / COMO FALAR do agente do Fields.
@@ -46,7 +48,7 @@
  * reescritas. A lista vale como guia de migração; a fonte é sempre o `tools/list`.
  *   list_entries → BuscarEntradas          get_entry → ConsultarEntrada
  *   create_entry → NovaEntrada             update_entry → EditarEntrada
- *   delete_entry → ExcluirEntrada (agora exclusão lógica: o dado fica no banco, mas pelo MCP não há volta)
+ *   delete_entry → ExcluirEntrada (agora exclusão lógica: o dado fica no banco e volta com RestaurarEntrada)
  *   add_thread / add_task_comment / add_meeting_comment → NovoComentario (alvo entrada/tarefa/reunião)
  *   list_projects → ListarProjetos         create_project → NovoProjeto     create_frente → NovaFrente
  *   create_task → NovaTarefa               update_task / move_task_kanban → EditarTarefa
@@ -154,9 +156,9 @@ const falhaDeTool = (texto) => ({ isError: true, content: [{ type: "text", text:
  *
  * Sem "(desfazível)", e sem turno_id/idx: o `desfazivel` do backend quer dizer "o POST
  * /api/agente/desfazer consegue inverter", e este canal não chama esse endpoint. Anunciar a volta
- * aqui fazia o modelo garantir ao Carlos um desfazer que ele não tem como executar — num
- * ExcluirProjeto, a árvore inteira. Como voltar atrás pelo MCP (e o que não tem volta) está no
- * prompt do canal, que o backend gera da ontologia.
+ * aqui fazia o modelo garantir ao Carlos um desfazer que ele não tem como executar. A volta pelo MCP
+ * é outra: chamar a operação inversa do catálogo (Excluir* ↔ Restaurar*, o editor) — e como, e o
+ * que nem isso tem, está no prompt do canal, que o backend gera da ontologia.
  */
 function textoDeSucesso({ resultado, acao }) {
   const corpo = typeof resultado === "string" ? resultado : JSON.stringify(resultado ?? null, null, 2);
@@ -258,8 +260,9 @@ const PROMPT_ASSISTENTE = {
 const INSTRUCOES =
   "Ferramentas do Fields' (notas, projetos → frentes → tarefas, kanban e agenda), projetadas da ontologia " +
   "do backend. Antes de agir, leia o prompt `assistente-fields` (ou o recurso fields://ontologia). " +
-  "Uma escrita executa na hora e não há desfazer por este canal: uma exclusão não tem volta — " +
-  "confirme o alvo com o Carlos antes. A data de hoje (fuso de Brasília) vem do ResumoDoDia.";
+  "Uma escrita executa na hora e não há desfazer por este canal: a volta é a operação inversa (o " +
+  "que foi excluído se acha na Lixeira e se restaura) — e antes de excluir, confirme o alvo com o " +
+  "Carlos. A data de hoje (fuso de Brasília) vem do ResumoDoDia.";
 
 /**
  * criarServidor({apiUrl, token, fetch?, log?, timeoutMs?}) → Server do SDK, ainda sem transporte.

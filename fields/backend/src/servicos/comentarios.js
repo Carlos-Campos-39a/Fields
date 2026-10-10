@@ -145,6 +145,18 @@ async function alvoDoComentarioVisivel(db, id) {
   return alvoVisivel(db, rows[0].alvo_tipo, rows[0].alvo_id);
 }
 
+/**
+ * A2c · um comentário vivo, pelo id — o que o ExcluirComentario do agente lê antes de excluir (o
+ * resumo da ação fala do alvo). Excluído, de alvo excluído ou escondido, ou inexistente →
+ * NAO_ENCONTRADO: o mesmo critério do DELETE, para a leitura não aceitar o que a escrita recusaria.
+ */
+export async function obterComentario(db, ctx, id) {
+  if (!comentariosMigrados(ctx)) return recusa("COMENTARIOS_INDISPONIVEIS");
+  const { rows } = await db.query("SELECT * FROM comentarios WHERE id = $1 AND deleted_at IS NULL", [id]);
+  if (rows.length === 0 || !(await alvoVisivel(db, rows[0].alvo_tipo, rows[0].alvo_id))) return recusa("NAO_ENCONTRADO");
+  return sucesso(toComentario(rows[0]));
+}
+
 export async function excluirComentario(db, ctx, id) {
   if (!comentariosMigrados(ctx)) return recusa("COMENTARIOS_INDISPONIVEIS");
   if (!(await alvoDoComentarioVisivel(db, id))) return recusa("NAO_ENCONTRADO");

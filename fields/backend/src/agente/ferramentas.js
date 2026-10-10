@@ -32,10 +32,11 @@ import * as tarefas from "../servicos/tarefas.js";
 import * as reunioes from "../servicos/reunioes.js";
 import * as comentarios from "../servicos/comentarios.js";
 import * as historico from "../servicos/historico.js";
+import * as lixeira from "../servicos/lixeira.js";
 import * as memorias from "../servicos/memorias.js";
 import * as resumo from "../servicos/resumo.js";
 import * as turnos from "../servicos/turnos.js";
-import { comentariosDoAgente, reuniaoDoAgente } from "../servicos/serializadores.js";
+import { comentariosDoAgente, reuniaoDoAgente, trecho } from "../servicos/serializadores.js";
 
 // ── Projeções curtas (o que uma escrita devolve) ──────────────────────────────
 // Toda saída leva o id ao lado do nome: o modelo encadeia pelo id, e o resumo da ação fala pelo nome.
@@ -141,6 +142,16 @@ async function _historicoEntidade(a, x) {
   }));
 }
 
+// No modo legado dos comentários a Lixeira sai sem eles — e diz isso, para a ausência não ser lida
+// como "nenhum comentário excluído".
+async function _lixeira(a, x) {
+  return depois(await lixeira.listarLixeira(x.db, x.sctx, { tipo: a.tipo, desdeDias: a.desde_dias, limite: a.limite ?? 30 }),
+    ({ itens, comentariosIndisponiveis }) => sucesso({
+      desde_dias: a.desde_dias, itens, total: itens.length,
+      ...(comentariosIndisponiveis && { comentarios_indisponiveis: true }),
+    }));
+}
+
 export const READ_EXECUTORS = {
   ResumoDoDia: _resumoDoDia,
   ProximosCompromissos: _proximosCompromissos,
@@ -152,6 +163,7 @@ export const READ_EXECUTORS = {
   ListarReunioes: _listarReunioes,
   ConsultarReuniao: _consultarReuniao,
   HistoricoEntidade: _historicoEntidade,
+  Lixeira: _lixeira,
 };
 
 // ── Escrita ───────────────────────────────────────────────────────────────────
@@ -271,6 +283,64 @@ async function _wNovoComentario(a, x) {
       (c) => sucesso({ comentario_id: c.id, alvo_tipo: c.alvo_tipo, alvo_id: c.alvo_id, alvo_nome: alvoNome })));
 }
 
+async function _wExcluirComentario(a, x) {
+  return depois(await comentarios.obterComentario(x.db, x.sctx, a.comentario_id), async (c) =>
+    depois(await nomeDoAlvo(x, c.alvo_tipo, c.alvo_id), async (alvoNome) =>
+      depois(await comentarios.excluirComentario(x.db, x.sctx, a.comentario_id), () => sucesso({
+        comentario_id: c.id, alvo_tipo: c.alvo_tipo, alvo_id: c.alvo_id, alvo_nome: alvoNome,
+        texto: trecho(c.texto), excluido: true,
+      }))));
+}
+
+// ── Restaurar* (A2c) ──
+//
+// Restaurar é a escrita que mais fácil "dá certo" sem acontecer: com o pai ainda excluído, o serviço
+// apaga o carimbo e o item segue escondido pela view (exclusao.restaurarLogico aceita) — e a leitura
+// de confirmação logo depois viraria NAO_ENCONTRADO com rollback, um motivo que não diz o que fazer.
+// Por isso o executor lê o item NA LIXEIRA antes, com os pais travados até o COMMIT, e recusa com
+// PAI_EXCLUIDO levando o `pai` que tem de voltar primeiro. Fora da Lixeira, a própria leitura separa
+// o escondido pelo pai sem carimbo próprio (ESCONDIDO_PELO_PAI, também com o `pai`) do vivo, já
+// restaurado ou inexistente (NAO_ESTA_NA_LIXEIRA). `ler(item)` monta a saída depois da escrita.
+async function restaurarDaLixeira(x, entidadeTipo, id, restaurar, ler) {
+  return depois(await lixeira.itemDaLixeira(x.db, x.sctx, entidadeTipo, id, { travar: true }), async (item) => {
+    if (item.pai_excluido) return { ...recusa("PAI_EXCLUIDO"), pai: item.pai ?? null };
+    return depois(await restaurar(x.db, x.sctx, id), () => ler(item));
+  });
+}
+
+async function _wRestaurarEntrada(a, x) {
+  return restaurarDaLixeira(x, "ENTRADA", a.entrada_id, entradas.restaurarEntrada, async () =>
+    depois(await entradas.obterEntrada(x.db, x.sctx, a.entrada_id), ({ entry }) => sucesso({ ...entradaCurta(entry), restaurada: true })));
+}
+
+async function _wRestaurarProjeto(a, x) {
+  return restaurarDaLixeira(x, "PROJETO", a.projeto_id, projetos.restaurarProjeto, async () =>
+    depois(await projetos.obterProjeto(x.db, x.sctx, a.projeto_id), (p) => sucesso({ ...p, restaurado: true })));
+}
+
+async function _wRestaurarFrente(a, x) {
+  return restaurarDaLixeira(x, "FRENTE", a.frente_id, frentes.restaurarFrente, async () =>
+    depois(await frentes.obterFrente(x.db, x.sctx, a.frente_id), (f) => sucesso({ ...f, restaurada: true })));
+}
+
+async function _wRestaurarTarefa(a, x) {
+  return restaurarDaLixeira(x, "TAREFA", a.tarefa_id, tarefas.restaurarTarefa, async () =>
+    depois(await tarefas.obterTarefa(x.db, x.sctx, a.tarefa_id), (t) => sucesso({ ...semComentarios(t), restaurada: true })));
+}
+
+async function _wRestaurarReuniao(a, x) {
+  return restaurarDaLixeira(x, "REUNIAO", a.reuniao_id, reunioes.restaurarReuniao, async () =>
+    depois(await reunioes.obterReuniao(x.db, x.sctx, a.reuniao_id), (m) => sucesso({ ...reuniaoDoAgente(m), restaurada: true })));
+}
+
+// O item da Lixeira já traz o alvo e o nome dele: não há o que reler.
+async function _wRestaurarComentario(a, x) {
+  return restaurarDaLixeira(x, "COMENTARIO", a.comentario_id, comentarios.restaurarComentario, (item) => sucesso({
+    comentario_id: item.comentario_id, alvo_tipo: item.alvo_tipo, alvo_id: item.alvo_id,
+    alvo_nome: item.alvo_nome, texto: item.texto, restaurado: true,
+  }));
+}
+
 async function _wLembrar(a, x) {
   return memorias.lembrar(x.db, x.sctx, { texto: a.texto, lembrar_em: a.lembrar_em ?? null });
 }
@@ -283,20 +353,27 @@ export const WRITE_EXECUTORS = {
   NovaEntrada: _wNovaEntrada,
   EditarEntrada: _wEditarEntrada,
   ExcluirEntrada: _wExcluirEntrada,
+  RestaurarEntrada: _wRestaurarEntrada,
   NovoProjeto: _wNovoProjeto,
   EditarProjeto: _wEditarProjeto,
   ExcluirProjeto: _wExcluirProjeto,
+  RestaurarProjeto: _wRestaurarProjeto,
   NovaFrente: _wNovaFrente,
   EditarFrente: _wEditarFrente,
   ExcluirFrente: _wExcluirFrente,
+  RestaurarFrente: _wRestaurarFrente,
   NovaTarefa: _wNovaTarefa,
   EditarTarefa: _wEditarTarefa,
   ConcluirTarefa: _wConcluirTarefa,
   ExcluirTarefa: _wExcluirTarefa,
+  RestaurarTarefa: _wRestaurarTarefa,
   NovaReuniao: _wNovaReuniao,
   EditarReuniao: _wEditarReuniao,
   ExcluirReuniao: _wExcluirReuniao,
+  RestaurarReuniao: _wRestaurarReuniao,
   NovoComentario: _wNovoComentario,
+  ExcluirComentario: _wExcluirComentario,
+  RestaurarComentario: _wRestaurarComentario,
   Lembrar: _wLembrar,
   Esquecer: _wEsquecer,
 };
@@ -327,6 +404,13 @@ export const ALVO_DA_ESCRITA = {
   EditarReuniao: ["REUNIAO", "reuniao_id"],
   ExcluirReuniao: ["REUNIAO", "reuniao_id"],
   NovoComentario: ["COMENTARIO", "comentario_id"],
+  ExcluirComentario: ["COMENTARIO", "comentario_id"],
+  RestaurarEntrada: ["ENTRADA", "entrada_id"],
+  RestaurarProjeto: ["PROJETO", "projeto_id"],
+  RestaurarFrente: ["FRENTE", "frente_id"],
+  RestaurarTarefa: ["TAREFA", "tarefa_id"],
+  RestaurarReuniao: ["REUNIAO", "reuniao_id"],
+  RestaurarComentario: ["COMENTARIO", "comentario_id"],
   Lembrar: null,
   Esquecer: null,
 };
@@ -422,6 +506,14 @@ export function resumoAcao(nome, args = {}, saida = {}) {
     case "EditarReuniao": return `Editou a reunião ${aspas(s.titulo)}: ${listaMudancas(nome, args)}`;
     case "ExcluirReuniao": return `Excluiu a reunião ${aspas(s.titulo)}`;
     case "NovoComentario": return `Comentou na ${rotulo("alvo_comentario", s.alvo_tipo)} ${aspas(s.alvo_nome)}`;
+    // A2c. Os rótulos de alvo_comentario são todos femininos (nota, tarefa, reunião): "da".
+    case "ExcluirComentario": return `Excluiu um comentário da ${rotulo("alvo_comentario", s.alvo_tipo)} ${aspas(s.alvo_nome)}`;
+    case "RestaurarComentario": return `Restaurou um comentário da ${rotulo("alvo_comentario", s.alvo_tipo)} ${aspas(s.alvo_nome)}`;
+    case "RestaurarEntrada": return `Restaurou ${aEntrada(s.tipo)} ${aspas(s.titulo)}`;
+    case "RestaurarProjeto": return `Restaurou o projeto ${aspas(s.nome)}, com as frentes e tarefas dele`;
+    case "RestaurarFrente": return `Restaurou a frente ${aspas(s.nome)}, com as tarefas dela`;
+    case "RestaurarTarefa": return `Restaurou a tarefa ${aspas(s.nome)}`;
+    case "RestaurarReuniao": return `Restaurou a reunião ${aspas(s.titulo)}`;
     case "Lembrar": return `Guardou na memória: ${aspas(s.texto, 120)}${s.lembrar_em ? ` (a partir de ${dataCurta(s.lembrar_em)})` : ""}`;
     case "Esquecer": return `Tirou da memória: ${aspas(s.texto, 120)}`;
     default: return "Executou uma ação";
@@ -472,6 +564,12 @@ const MENSAGENS = {
   COMENTARIOS_INDISPONIVEIS: "Os comentários estão indisponíveis no momento.",
   COMENTARIOS_INVALIDOS: "Comentários ilegíveis.",
   COMENTARIOS_DESATUALIZADOS: "Os comentários mudaram nesse meio-tempo.",
+  // Restaurar* (A2c)
+  PAI_EXCLUIDO: "Isso está dentro de algo que também está excluído: restaure antes o `pai` indicado, e depois isto.",
+  // Não manda restaurar "isto depois": o item não tem carimbo, e um segundo Restaurar* dele recusaria.
+  ESCONDIDO_PELO_PAI: "Isso não foi excluído: sumiu porque o `pai` indicado está excluído. Restaure o `pai`, não isto — " +
+    "isto reaparece sozinho quando nada acima dele seguir excluído.",
+  NAO_ESTA_NA_LIXEIRA: "Isso não está na Lixeira: não foi excluído (está à vista), já foi restaurado ou o id não existe.",
   // desfazer.js
   NADA_A_DESFAZER: "Não há nada a desfazer nesse turno.",
   SEM_INVERSO: "Essa ação não tem como ser desfeita automaticamente.",

@@ -422,3 +422,163 @@ test("BuscarTarefas acha sem acento e sem caixa; NovoComentario aparece em Consu
     assert.deepEqual(hist.eventos.map((e) => [e.acao, e.desfez_outro]), [["EXCLUIDO", true], ["CRIADO", false]]);
   });
 });
+
+// ─── A2c · Lixeira e Restaurar* ───
+
+const contarTurnos = async (pool) => (await pool.query("SELECT COUNT(*)::int AS n FROM agente_turnos")).rows[0].n;
+
+test("Lixeira: só o que tem o PRÓPRIO carimbo — nem o vivo, nem o escondido pela cascata; contexto, pai, tipo, limite e janela", { skip }, async () => {
+  await cenario(async ({ chamar, pool }) => {
+    const { p, f, t } = await arvoreBasica(chamar);
+    const viva = ok(await op(chamar, "NovaTarefa", { frente_id: f.frente_id, nome: "Viva" })).resultado;
+    const nota = ok(await op(chamar, "NovaEntrada", { tipo: "note", titulo: "Ideia" })).resultado;
+    ok(await op(chamar, "ExcluirEntrada", { entrada_id: nota.entrada_id }));
+    ok(await op(chamar, "ExcluirTarefa", { tarefa_id: t.tarefa_id }));
+
+    let lixo = ok(await op(chamar, "Lixeira", {})).resultado;
+    assert.equal(lixo.desde_dias, 30);
+    assert.deepEqual(lixo.itens.map((i) => i.entidade_tipo), ["TAREFA", "ENTRADA"], "a exclusão mais recente primeiro");
+    const [tarefaExcluida, notaExcluida] = lixo.itens;
+    assert.deepEqual(
+      [tarefaExcluida.tarefa_id, tarefaExcluida.nome, tarefaExcluida.frente, tarefaExcluida.projeto, tarefaExcluida.pai_excluido],
+      [t.tarefa_id, "Revisar deck", "Cobrança", "McKinsey", false]
+    );
+    assert.deepEqual([notaExcluida.entrada_id, notaExcluida.titulo, notaExcluida.tipo], [nota.entrada_id, "Ideia", "note"]);
+    assert.ok(!Number.isNaN(Date.parse(tarefaExcluida.excluido_em)));
+    assert.ok(!lixo.itens.some((i) => i.tarefa_id === viva.tarefa_id), "o vivo não aparece");
+
+    // O projeto entra; a frente e a tarefa viva, só escondidas por ele, NÃO (voltam junto com ele);
+    // a tarefa excluída antes passa a ter o projeto como `pai` a restaurar antes.
+    ok(await op(chamar, "ExcluirProjeto", { projeto_id: p.projeto_id }));
+    lixo = ok(await op(chamar, "Lixeira", {})).resultado;
+    assert.deepEqual(lixo.itens.map((i) => i.entidade_tipo), ["PROJETO", "TAREFA", "ENTRADA"]);
+    assert.ok(!lixo.itens.some((i) => i.frente_id === f.frente_id && i.entidade_tipo === "FRENTE"), "a frente escondida não está na Lixeira");
+    assert.ok(!lixo.itens.some((i) => i.tarefa_id === viva.tarefa_id), "nem a tarefa viva escondida");
+    const agora = lixo.itens.find((i) => i.entidade_tipo === "TAREFA");
+    assert.equal(agora.pai_excluido, true);
+    assert.deepEqual(agora.pai, { entidade_tipo: "PROJETO", entidade_id: p.projeto_id, nome: "McKinsey" });
+
+    assert.deepEqual(ok(await op(chamar, "Lixeira", { tipo: "PROJETO" })).resultado.itens.map((i) => i.projeto_id), [p.projeto_id]);
+    assert.deepEqual(ok(await op(chamar, "Lixeira", { limite: 1 })).resultado.itens.map((i) => i.entidade_tipo), ["PROJETO"]);
+
+    // A janela: excluída há 40 dias some do padrão (30) e aparece com 60 — e volta mesmo assim.
+    await pool.query("UPDATE entries SET deleted_at = NOW() - INTERVAL '40 days' WHERE id = $1", [nota.entrada_id]);
+    assert.ok(!ok(await op(chamar, "Lixeira", {})).resultado.itens.some((i) => i.entidade_tipo === "ENTRADA"));
+    assert.ok(ok(await op(chamar, "Lixeira", { desde_dias: 60 })).resultado.itens.some((i) => i.entrada_id === nota.entrada_id));
+    const volta = ok(await op(chamar, "RestaurarEntrada", { entrada_id: nota.entrada_id }));
+    assert.equal(volta.acao.resumo, "Restaurou a nota “Ideia”");
+    assert.equal(ok(await op(chamar, "ConsultarEntrada", { entrada_id: nota.entrada_id })).resultado.entrada.titulo, "Ideia");
+  });
+});
+
+test("Restaurar*: PAI_EXCLUIDO (409) sem escrever nada; o escondido sem carimbo → ESCONDIDO_PELO_PAI apontando o pai; projeto, depois frente; restaurar → desfazer → excluída de novo", { skip }, async () => {
+  await cenario(async ({ chamar, pool }) => {
+    const { p, f, t } = await arvoreBasica(chamar);
+    ok(await op(chamar, "ExcluirFrente", { frente_id: f.frente_id }));
+    ok(await op(chamar, "ExcluirProjeto", { projeto_id: p.projeto_id }));
+    const turnosAntes = await contarTurnos(pool);
+
+    // Sem a recusa, a frente perderia o carimbo e seguiria escondida pelo projeto: um "restaurei" que
+    // ninguém vê. A recusa volta tudo atrás — nem carimbo, nem turno, nem evento.
+    const recusa = await op(chamar, "RestaurarFrente", { frente_id: f.frente_id });
+    assert.deepEqual([recusa.status, recusa.json.codigo], [409, "PAI_EXCLUIDO"]);
+    assert.deepEqual(recusa.json.pai, { entidade_tipo: "PROJETO", entidade_id: p.projeto_id, nome: "McKinsey" });
+    const { rows: [frente] } = await pool.query("SELECT deleted_at FROM frentes WHERE id = $1", [f.frente_id]);
+    assert.ok(frente.deleted_at instanceof Date, "a frente continua com o próprio carimbo");
+    assert.equal(await contarTurnos(pool), turnosAntes, "a recusa não deixa turno");
+    assert.deepEqual((await eventosDe(pool, "FRENTE", f.frente_id)).map((e) => e.acao), ["CRIADO", "EXCLUIDO"]);
+
+    // A tarefa só está escondida (sem carimbo próprio): não há o que restaurar nela, mas o id dela
+    // chega de uma busca anterior. "Nunca foi excluída" seria mentira para quem não a vê mais na tela:
+    // a recusa diz que ela some pelo pai, e aponta o mais alto (o projeto).
+    const escondida = await op(chamar, "RestaurarTarefa", { tarefa_id: t.tarefa_id });
+    assert.deepEqual([escondida.status, escondida.json.codigo], [409, "ESCONDIDO_PELO_PAI"]);
+    assert.deepEqual(escondida.json.pai, { entidade_tipo: "PROJETO", entidade_id: p.projeto_id, nome: "McKinsey" });
+    assert.equal(await contarTurnos(pool), turnosAntes, "nem esta recusa deixa turno");
+
+    const rp = ok(await op(chamar, "RestaurarProjeto", { projeto_id: p.projeto_id }));
+    assert.deepEqual([rp.acao.acao, rp.acao.desfazivel], ["RESTAURAR_PROJETO", true]);
+    assert.equal(rp.acao.resumo, "Restaurou o projeto “McKinsey”, com as frentes e tarefas dele");
+    assert.equal(ok(await op(chamar, "BuscarTarefas", { projeto_id: p.projeto_id })).resultado.total, 0, "a frente excluída sozinha continua fora — e com ela a tarefa");
+    // Com o projeto de volta, a mesma tarefa segue escondida — agora só pela frente, que a recusa aponta.
+    const pelaFrente = await op(chamar, "RestaurarTarefa", { tarefa_id: t.tarefa_id });
+    assert.deepEqual([pelaFrente.status, pelaFrente.json.codigo], [409, "ESCONDIDO_PELO_PAI"]);
+    assert.deepEqual(pelaFrente.json.pai, { entidade_tipo: "FRENTE", entidade_id: f.frente_id, nome: "Cobrança" });
+
+    const rf = ok(await op(chamar, "RestaurarFrente", { frente_id: f.frente_id }));
+    assert.deepEqual([rf.resultado.nome, rf.resultado.projeto, rf.resultado.restaurada], ["Cobrança", "McKinsey", true]);
+    assert.equal(ok(await op(chamar, "BuscarTarefas", { projeto_id: p.projeto_id })).resultado.total, 1, "a frente devolve a tarefa que escondia");
+    // À vista, ela não está na Lixeira nem escondida: aí sim, NAO_ESTA_NA_LIXEIRA.
+    const aVista = await op(chamar, "RestaurarTarefa", { tarefa_id: t.tarefa_id });
+    assert.deepEqual([aVista.status, aVista.json.codigo, "pai" in aVista.json], [404, "NAO_ESTA_NA_LIXEIRA", false]);
+
+    // O inverso de restaurar é excluir de novo — pelo serviço, com desfaz_id no evento.
+    ok(await desfazer(chamar, { turno_id: rf.acao.turno_id }));
+    const { rows: [deNovo] } = await pool.query("SELECT deleted_at FROM frentes WHERE id = $1", [f.frente_id]);
+    assert.ok(deNovo.deleted_at instanceof Date, "excluída de novo");
+    const eventos = await eventosDe(pool, "FRENTE", f.frente_id);
+    assert.deepEqual(eventos.slice(-2).map((e) => e.acao), ["RESTAURADO", "EXCLUIDO"]);
+    assert.equal(eventos.at(-1).desfaz_id, eventos.at(-2).id);
+    assert.equal(ok(await op(chamar, "BuscarTarefas", { projeto_id: p.projeto_id })).resultado.total, 0);
+    assert.ok(ok(await op(chamar, "Lixeira", { tipo: "FRENTE" })).resultado.itens.some((i) => i.frente_id === f.frente_id));
+
+    // Restaurar o que já voltou: não está mais na Lixeira.
+    const deNovoProjeto = await op(chamar, "RestaurarProjeto", { projeto_id: p.projeto_id });
+    assert.deepEqual([deNovoProjeto.status, deNovoProjeto.json.codigo], [404, "NAO_ESTA_NA_LIXEIRA"]);
+
+    // A reunião, pelo mesmo caminho.
+    const r = ok(await op(chamar, "NovaReuniao", { titulo: "Banca", data: AMANHA() })).resultado;
+    ok(await op(chamar, "ExcluirReuniao", { reuniao_id: r.reuniao_id }));
+    const rr = ok(await op(chamar, "RestaurarReuniao", { reuniao_id: r.reuniao_id }));
+    assert.equal(rr.acao.resumo, "Restaurou a reunião “Banca”");
+    assert.equal(ok(await op(chamar, "ConsultarReuniao", { reuniao_id: r.reuniao_id })).resultado.reuniao.titulo, "Banca");
+  });
+});
+
+test("ExcluirComentario → RestaurarComentario: o id vem de ConsultarTarefa; cada um se desfaz; de alvo excluído → PAI_EXCLUIDO; o vivo do alvo excluído → ESCONDIDO_PELO_PAI", { skip }, async () => {
+  await cenario(async ({ chamar }) => {
+    const { t } = await arvoreBasica(chamar);
+    const comentariosDe = async () => ok(await op(chamar, "ConsultarTarefa", { tarefa_id: t.tarefa_id })).resultado.comentarios;
+    ok(await op(chamar, "NovoComentario", { alvo_tipo: "TAREFA", alvo_id: t.tarefa_id, texto: "primeiro" }));
+    const [c] = await comentariosDe();
+    assert.deepEqual(Object.keys(c), ["comentario_id", "texto", "criado_em"]);
+    assert.ok(c.comentario_id, "a leitura traz o id: sem ele não há o que excluir");
+
+    const ex = ok(await op(chamar, "ExcluirComentario", { comentario_id: c.comentario_id }));
+    assert.deepEqual([ex.acao.acao, ex.acao.desfazivel], ["EXCLUIR_COMENTARIO", true]);
+    assert.equal(ex.acao.resumo, "Excluiu um comentário da tarefa “Revisar deck”");
+    assert.deepEqual(await comentariosDe(), []);
+    const naLixeira = ok(await op(chamar, "Lixeira", { tipo: "COMENTARIO" })).resultado.itens;
+    assert.deepEqual(naLixeira.map((i) => [i.comentario_id, i.texto, i.alvo_tipo, i.alvo_nome, i.pai_excluido]),
+      [[c.comentario_id, "primeiro", "TAREFA", "Revisar deck", false]]);
+
+    // O desfazer da exclusão restaura; e pela operação: excluir de novo, restaurar, desfazer o restaurar.
+    ok(await desfazer(chamar, { turno_id: ex.acao.turno_id }));
+    assert.deepEqual((await comentariosDe()).map((x) => x.texto), ["primeiro"]);
+    ok(await op(chamar, "ExcluirComentario", { comentario_id: c.comentario_id }));
+    const rc = ok(await op(chamar, "RestaurarComentario", { comentario_id: c.comentario_id }));
+    assert.equal(rc.acao.resumo, "Restaurou um comentário da tarefa “Revisar deck”");
+    assert.deepEqual((await comentariosDe()).map((x) => x.comentario_id), [c.comentario_id], "o mesmo comentário, não um novo");
+    ok(await desfazer(chamar, { turno_id: rc.acao.turno_id }));
+    assert.deepEqual(await comentariosDe(), [], "desfazer o restaurar exclui de novo");
+
+    // Um segundo comentário, vivo: o id dele o modelo guarda de uma consulta antes de a tarefa sumir.
+    ok(await op(chamar, "NovoComentario", { alvo_tipo: "TAREFA", alvo_id: t.tarefa_id, texto: "segundo" }));
+    const [vivo] = await comentariosDe();
+
+    // Com a tarefa-alvo excluída, o comentário não volta sozinho: a recusa aponta a tarefa.
+    ok(await op(chamar, "ExcluirTarefa", { tarefa_id: t.tarefa_id }));
+    const r = await op(chamar, "RestaurarComentario", { comentario_id: c.comentario_id });
+    assert.deepEqual([r.status, r.json.codigo], [409, "PAI_EXCLUIDO"]);
+    assert.deepEqual(r.json.pai, { entidade_tipo: "TAREFA", entidade_id: t.tarefa_id, nome: "Revisar deck" });
+    // O vivo nunca foi excluído — sumiu com a tarefa. A recusa diz isso, e aponta a mesma tarefa.
+    const escondido = await op(chamar, "RestaurarComentario", { comentario_id: vivo.comentario_id });
+    assert.deepEqual([escondido.status, escondido.json.codigo], [409, "ESCONDIDO_PELO_PAI"]);
+    assert.deepEqual(escondido.json.pai, { entidade_tipo: "TAREFA", entidade_id: t.tarefa_id, nome: "Revisar deck" });
+
+    ok(await op(chamar, "RestaurarTarefa", { tarefa_id: t.tarefa_id }));
+    assert.deepEqual((await comentariosDe()).map((x) => x.texto), ["segundo"], "o escondido volta junto com a tarefa; o excluído, não");
+    ok(await op(chamar, "RestaurarComentario", { comentario_id: c.comentario_id }));
+    assert.deepEqual((await comentariosDe()).map((x) => x.texto), ["primeiro", "segundo"]);
+  });
+});

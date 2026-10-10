@@ -52,9 +52,11 @@ test("toda operação tem executor do tipo certo — e todo executor é de uma o
   for (const n of [...Object.keys(READ_EXECUTORS), ...Object.keys(WRITE_EXECUTORS)]) assert.ok(universo.has(n), n);
 });
 
-test("as operações são as do plano: 10 leituras e 19 escritas, nomes únicos", () => {
-  assert.equal(base.read.length, 10);
-  assert.equal(base.write.length, 19);
+test("as operações são as do plano: 11 leituras e 26 escritas, nomes únicos", () => {
+  // A2c: + Lixeira (READ); + Restaurar{Entrada,Projeto,Frente,Tarefa,Reuniao}, ExcluirComentario e
+  // RestaurarComentario (WRITE). Mudar estes números é decisão, não efeito colateral.
+  assert.equal(base.read.length, 11);
+  assert.equal(base.write.length, 26);
   assert.equal(new Set(nomes(BASE)).size, BASE.length);
   // Sem a flag no ambiente de teste, as ativas são a base inteira.
   assert.deepEqual(nomes(OPERATIONS), nomes(BASE));
@@ -94,6 +96,9 @@ test("NODES descreve as sete entidades; RELATIONSHIPS cita as quatro arestas", (
   const rels = RELATIONSHIPS.join(" ");
   for (const aresta of ["TEM_FRENTE", "TEM_TAREFA", "SOBRE", "COMPARTILHA_TAG"]) assert.ok(rels.includes(aresta), aresta);
   assert.match(rels, /restaurar devolve/, "a nota da cascata lógica");
+  // A2c: o comentário sai e volta (ExcluirComentario/RestaurarComentario) — "só se acrescenta" mentiria.
+  assert.doesNotMatch(NODES.Comentario, /só se acrescenta/);
+  assert.match(NODES.Comentario, /se exclui e se restaura/);
 });
 
 test("NODES interpola os enums canônicos — e a Tarefa declara os DOIS eixos e o concluir que move os dois", () => {
@@ -124,8 +129,13 @@ test("a flag AGENTE_SOMENTE_LEITURA tira toda WRITE da lista, do prompt, do cat�
   }
   // Sem escrita, nada de "como voltar atrás": falar do desfazer do que não se pode fazer convida a tentar.
   const mcp = systemPrompt({ canal: "mcp", operacoes: SO_LEITURA });
-  for (const fora of ["Não existe ferramenta de desfazer", "Voltar atrás", "Excluir*", "Lembrar e Esquecer"]) {
+  for (const fora of ["Não existe ferramenta de desfazer", "Voltar atrás", "Excluir*", "Restaurar*", "Lembrar e Esquecer"]) {
     assert.ok(!mcp.includes(fora), fora);
+  }
+  // A Lixeira é LEITURA: continua no modo somente consulta (ver o que foi excluído não escreve nada).
+  for (const canal of CANAIS) {
+    assert.ok(systemPrompt({ canal, operacoes: SO_LEITURA }).includes("Lixeira [READ]"), canal);
+    assert.ok(!systemPrompt({ canal, operacoes: SO_LEITURA }).includes("Restaurar*"), canal);
   }
 });
 
@@ -155,7 +165,7 @@ test("a flag de verdade, lida no import: só READ em OPERATIONS, no prompt e no 
   });
   assert.equal(r.status, 0, r.stderr);
   const saida = JSON.parse(r.stdout);
-  assert.ok(saida.ops.length === 10 && saida.ops.every((t) => t === "READ"));
+  assert.ok(saida.ops.length === 11 && saida.ops.every((t) => t === "READ"));
   assert.deepEqual(saida.writes, []);
   assert.ok(!saida.prompt.includes("NovaTarefa ["));
   assert.match(saida.prompt, /somente consulta/);
@@ -211,14 +221,24 @@ test("quem tem inverso tem alvo e vice-versa; as sem inverso são exatamente Lem
   assert.deepEqual(new Set(Object.keys(INVERSOS).filter((n) => INVERSOS[n] === null)), new Set(["Lembrar", "Esquecer"]));
 });
 
-test("o alvo de cada escrita é uma entidade do histórico, e o inverso casa com o verbo (Nova→EXCLUIR, Excluir→RESTAURAR, Editar/Concluir→REVERTER)", () => {
+test("o alvo de cada escrita é uma entidade do histórico, e o inverso casa com o verbo (Nova/Restaurar→EXCLUIR, Excluir→RESTAURAR, Editar/Concluir→REVERTER)", () => {
   for (const [nome, alvo] of Object.entries(ALVO_DA_ESCRITA)) {
     if (!alvo) continue;
     assert.ok(ENTIDADES.includes(alvo[0]), nome);
     assert.match(alvo[1], /_id$/, nome);
-    const esperado = /^Nov[ao]/.test(nome) ? "EXCLUIR" : /^Excluir/.test(nome) ? "RESTAURAR" : "REVERTER";
+    const esperado = /^(Nov[ao]|Restaurar)/.test(nome) ? "EXCLUIR" : /^Excluir/.test(nome) ? "RESTAURAR" : "REVERTER";
     assert.equal(INVERSOS[nome], esperado, nome);
   }
+  // A2c, os casos novos por extenso (o laço acima só cobre o que ele mesmo classifica).
+  assert.equal(INVERSOS.ExcluirComentario, "RESTAURAR");
+  assert.equal(INVERSOS.RestaurarComentario, "EXCLUIR");
+  for (const e of ["Entrada", "Projeto", "Frente", "Tarefa", "Reuniao"]) {
+    assert.equal(INVERSOS[`Restaurar${e}`], "EXCLUIR", e);
+    assert.deepEqual(ALVO_DA_ESCRITA[`Restaurar${e}`], ALVO_DA_ESCRITA[`Excluir${e}`], `${e}: restaurar e excluir tocam o mesmo alvo`);
+  }
+  // Todo Excluir* tem o seu Restaurar*, e vice-versa: a exclusão nunca fica sem volta pelo catálogo.
+  const verbo = (prefixo) => nomes(base.write).filter((n) => n.startsWith(prefixo)).map((n) => n.slice(prefixo.length)).sort();
+  assert.deepEqual(verbo("Excluir"), verbo("Restaurar"));
 });
 
 test("camposReversiveis == as chaves do MAPA do editor menos o id — e o MAPA tem exatamente as chaves do schema", () => {
@@ -310,6 +330,9 @@ test("só o WhatsApp tem o teto de 4 frases e o aviso de transcrição; só o MC
   assert.match(p.mcp, /markdown liberado/);
   assert.match(p.mcp, /NÃO têm volta por este canal/);
   assert.match(p.mcp, /antes de chamar um Excluir\*, confirme com o Carlos o alvo pelo NOME/);
+  // A2c: a exclusão tem volta pelo catálogo — o prompt não pode mais dizer o contrário.
+  assert.doesNotMatch(p.mcp, /dizendo que não há volta|não há Restaurar|uma exclusão não tem volta/);
+  assert.match(p.mcp, /Uma exclusão de outro dia se acha na Lixeira/);
   for (const c of ["web", "whatsapp"]) assert.ok(!p[c].includes("NÃO têm volta"), c);
   assert.match(p.whatsapp, /\*desfazer\*/);
   assert.match(p.web, /botão Desfazer/);
@@ -317,34 +340,66 @@ test("só o WhatsApp tem o teto de 4 frases e o aviso de transcrição; só o MC
   for (const c of CANAIS) assert.doesNotMatch(p[c], /restaura pela tela|tela do Fields restaura/, c);
 });
 
-test("a volta pelo MCP bate com INVERSOS: toda escrita sem inverso alcançável pelo catálogo está nomeada como sem volta", () => {
+test("a volta pelo MCP bate com INVERSOS: cada inverso tem a sua operação no catálogo, e só a memória fica sem volta", () => {
   // A autoridade é desfazer.js (INVERSOS + ALVO_DA_ESCRITA); ontologia.js deriva o texto dos códigos
   // `acao`, porque não pode importar o desfazer (que importa os serviços). Este teste junta os dois.
+  //
+  // A operação do catálogo que faz o papel de cada inverso, sobre a MESMA entidade:
+  //   EXCLUIR   → a escrita cujo inverso é RESTAURAR (a que exclui: Excluir*);
+  //   RESTAURAR → a escrita que traz de volta (Restaurar*, inverso EXCLUIR, sem ser criação);
+  //   REVERTER  → o editor do tipo (EDITOR).
   const escritas = base.write.map((op) => op.name);
-  const excluirDe = Object.fromEntries(
-    escritas.filter((n) => INVERSOS[n] === "RESTAURAR").map((n) => [ALVO_DA_ESCRITA[n][0], n])
+  const entidade = (n) => ALVO_DA_ESCRITA[n][0];
+  const ehCriacao = (n) => ACAO_BY_NAME[n].startsWith("NOVA_") || ACAO_BY_NAME[n].startsWith("NOVO_");
+  const excluirDe = Object.fromEntries(escritas.filter((n) => INVERSOS[n] === "RESTAURAR").map((n) => [entidade(n), n]));
+  const restaurarDe = Object.fromEntries(
+    escritas.filter((n) => INVERSOS[n] === "EXCLUIR" && !ehCriacao(n)).map((n) => [entidade(n), n])
   );
-  const esperadoSemVolta = new Set([
-    ...escritas.filter((n) => INVERSOS[n] === "RESTAURAR"),                                   // não há Restaurar* no catálogo
-    ...escritas.filter((n) => INVERSOS[n] === "EXCLUIR" && !excluirDe[ALVO_DA_ESCRITA[n][0]]), // criação sem Excluir do tipo
-  ]);
-  const esperadoPares = escritas
-    .filter((n) => INVERSOS[n] === "EXCLUIR" && excluirDe[ALVO_DA_ESCRITA[n][0]])
-    .map((n) => `${n} → ${excluirDe[ALVO_DA_ESCRITA[n][0]]}`);
-  // A edição volta pelo editor do mesmo tipo, que tem de estar no catálogo.
-  for (const n of escritas.filter((x) => INVERSOS[x] === "REVERTER")) {
-    assert.ok(escritas.includes(EDITOR[ALVO_DA_ESCRITA[n][0]]), n);
-  }
+  const voltaDe = (n) => {
+    if (INVERSOS[n] === "EXCLUIR") return excluirDe[entidade(n)];
+    if (INVERSOS[n] === "RESTAURAR") return restaurarDe[entidade(n)];
+    if (INVERSOS[n] === "REVERTER") return escritas.includes(EDITOR[entidade(n)]) ? EDITOR[entidade(n)] : undefined;
+    return undefined; // null: sem inverso
+  };
+  const esperadoSemVolta = escritas.filter((n) => !voltaDe(n));
+  const esperadoPares = escritas.filter((n) => INVERSOS[n] === "EXCLUIR" && ehCriacao(n) && voltaDe(n)).map((n) => `${n} → ${voltaDe(n)}`);
+  const esperadoExclusoes = escritas.filter((n) => INVERSOS[n] === "RESTAURAR" && voltaDe(n)).map((n) => `${n} ↔ ${voltaDe(n)}`);
+  // O par vale nos DOIS sentidos: a volta da restauração é a mesma exclusão.
+  for (const n of Object.values(restaurarDe)) assert.equal(voltaDe(voltaDe(n)), n, n);
 
-  const { pares, semVolta } = _voltaNoMcp(BASE);
-  assert.deepEqual(new Set(semVolta), esperadoSemVolta);
+  const { pares, exclusoes, semVolta } = _voltaNoMcp(BASE);
+  assert.deepEqual(semVolta, esperadoSemVolta);
   assert.deepEqual(pares, esperadoPares);
-  assert.ok(semVolta.includes("NovoComentario"), "não existe ExcluirComentario");
+  assert.deepEqual(exclusoes, esperadoExclusoes);
+  // A2c, por extenso: o sem-volta é só a memória; o comentário ganhou volta nos dois sentidos.
+  assert.deepEqual(semVolta, ["Lembrar", "Esquecer"]);
+  assert.ok(pares.includes("NovoComentario → ExcluirComentario"));
+  assert.ok(exclusoes.includes("ExcluirComentario ↔ RestaurarComentario"));
+  assert.ok(exclusoes.includes("ExcluirProjeto ↔ RestaurarProjeto"));
 
   const p = systemPrompt({ canal: "mcp" });
   const frase = p.slice(p.indexOf("NÃO têm volta por este canal:"));
   for (const n of semVolta) assert.ok(frase.split("\n")[0].includes(n), `${n} fora da frase de 'sem volta'`);
-  for (const par of pares) assert.ok(p.includes(par), par);
+  for (const n of escritas.filter((x) => !semVolta.includes(x))) {
+    assert.ok(!frase.split("\n")[0].includes(`${n},`) && !frase.split("\n")[0].includes(`${n} —`), `${n} na frase de 'sem volta'`);
+  }
+  for (const par of [...pares, ...exclusoes]) assert.ok(p.includes(par), par);
+});
+
+test("_voltaNoMcp: o verbo sem par cai em 'sem volta' (o lado seguro), e a frase some quando não sobra nenhum", () => {
+  // Uma exclusão sem Restaurar do tipo (o estado de antes da A2c) volta a ser 'sem volta' sozinha.
+  const semRestaurarTarefa = BASE.filter((op) => op.name !== "RestaurarTarefa");
+  const v = _voltaNoMcp(semRestaurarTarefa);
+  assert.ok(v.semVolta.includes("ExcluirTarefa"));
+  assert.ok(!v.exclusoes.some((x) => x.startsWith("ExcluirTarefa")));
+  // E um Restaurar sem o Excluir do tipo também.
+  assert.ok(_voltaNoMcp(BASE.filter((op) => op.name !== "ExcluirReuniao")).semVolta.includes("RestaurarReuniao"));
+  // Sem a memória, ninguém fica sem volta — e o prompt não anuncia uma lista vazia.
+  const semMemoria = BASE.filter((op) => !["Lembrar", "Esquecer"].includes(op.name));
+  assert.deepEqual(_voltaNoMcp(semMemoria).semVolta, []);
+  const p = systemPrompt({ canal: "mcp", operacoes: semMemoria });
+  assert.ok(!p.includes("NÃO têm volta por este canal"));
+  assert.match(p, /antes de chamar um Excluir\*, confirme com o Carlos o alvo pelo NOME/, "a confirmação não depende da lista");
 });
 
 test("o MCP não recebe bloco de contexto: o prompt dele não promete <contexto>/<memoria> e cita ResumoDoDia como fonte da data", () => {
@@ -372,6 +427,13 @@ test("COMO AGIR manda agir, com os defaults declarados um a um e a única pergun
   assert.ok(agir.includes("tarefa › frente › projeto"));
   for (const ancora of ["BuscarTarefas", "DATA ausente", "<contexto agora=", "ConcluirTarefa", "Não existe ferramenta de desfazer"]) {
     assert.ok(agir.includes(ancora), ancora);
+  }
+  // A2c: a volta de uma exclusão antiga existe em todo canal, e o pai vem antes.
+  for (const canal of CANAIS) {
+    const pc = systemPrompt({ canal });
+    const a = pc.slice(pc.indexOf("COMO AGIR"), pc.indexOf("COMO FALAR"));
+    assert.ok(a.includes("Lixeira → Restaurar*"), canal);
+    assert.ok(a.includes("restaure antes o `pai`"), canal);
   }
 });
 
@@ -464,6 +526,12 @@ test("os enums do catálogo SÃO as listas canônicas (o MCP não tem enum escri
   assert.deepEqual(inputSchema("NovoProjeto").properties.holder.enum, [...HOLDERS]);
   assert.deepEqual(inputSchema("NovoComentario").properties.alvo_tipo.enum, [...ALVOS_COMENTARIO]);
   assert.deepEqual(inputSchema("HistoricoEntidade").properties.entidade_tipo.enum, [...ENTIDADES]);
+  assert.deepEqual(inputSchema("Lixeira").properties.tipo.enum, [...ENTIDADES]);
+  assert.equal(inputSchema("Lixeira").properties.desde_dias.default, 30);
+  assert.equal(inputSchema("Lixeira").required, undefined, "tudo opcional: sem argumento, a lixeira dos últimos 30 dias");
+  for (const [nome, chave] of [["RestaurarTarefa", "tarefa_id"], ["ExcluirComentario", "comentario_id"], ["RestaurarComentario", "comentario_id"]]) {
+    assert.deepEqual(inputSchema(nome).required, [chave], nome);
+  }
   assert.equal(inputSchema("NovaReuniao").properties.data.format, "date");
   assert.deepEqual(inputSchema("ConcluirTarefa").required, ["tarefa_id"]);
   assert.equal(inputSchema("ProximosCompromissos").required, undefined, "default não é obrigatório");
@@ -482,7 +550,13 @@ test("anotações derivadas: readOnly = READ, destructive = inverso RESTAURAR, i
     assert.deepEqual(op.annotations, anotacoes(o));
   }
   const destrutivas = catalogo().ops.filter((o) => o.annotations.destructiveHint).map((o) => o.name).sort();
-  assert.deepEqual(destrutivas, ["ExcluirEntrada", "ExcluirFrente", "ExcluirProjeto", "ExcluirReuniao", "ExcluirTarefa"]);
+  assert.deepEqual(destrutivas, ["ExcluirComentario", "ExcluirEntrada", "ExcluirFrente", "ExcluirProjeto", "ExcluirReuniao", "ExcluirTarefa"]);
+  // Restaurar* devolve o que estava escondido: nem destrutiva, nem idempotente (a segunda chamada
+  // recusa com NAO_ESTA_NA_LIXEIRA), nem leitura.
+  for (const op of catalogo().ops.filter((o) => o.name.startsWith("Restaurar"))) {
+    assert.deepEqual(op.annotations, { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, op.name);
+  }
+  assert.equal(catalogo().ops.find((o) => o.name === "Lixeira").annotations.readOnlyHint, true);
 });
 
 test("ferramentasClaude() é o MESMO dado do catálogo, no formato da Messages API — sem strict (o zod é a autoridade)", () => {
@@ -506,8 +580,10 @@ test("o orçamento do strict, que é POR REQUISIÇÃO, cabe nos dois estados da 
 
 test("orcamentoStrict mede de verdade: o catálogo inteiro em strict estoura (é por isso que ele saiu)", () => {
   const tudoStrict = (operacoes) => ferramentasClaude({ operacoes }).map((f) => ({ ...f, strict: true }));
-  assert.deepEqual(orcamentoStrict(tudoStrict(BASE)), { ferramentas: 29, opcionais: 62, unioes: 3 });
-  assert.deepEqual(orcamentoStrict(tudoStrict(SO_LEITURA)), { ferramentas: 10, opcionais: 18, unioes: 0 },
+  // A2c: +8 ferramentas; os Restaurar*/ExcluirComentario só têm o id (obrigatório), e a Lixeira
+  // soma 3 opcionais (tipo, desde_dias com default, limite).
+  assert.deepEqual(orcamentoStrict(tudoStrict(BASE)), { ferramentas: 37, opcionais: 65, unioes: 3 });
+  assert.deepEqual(orcamentoStrict(tudoStrict(SO_LEITURA)), { ferramentas: 11, opcionais: 21, unioes: 0 },
     "só leitura cabe — o que escondia o defeito no rollout");
   // Só `strict: true` conta, e o que está em `required` não é opcional; anyOf e type em lista são união.
   assert.deepEqual(orcamentoStrict([

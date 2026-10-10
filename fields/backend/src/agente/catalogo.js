@@ -116,11 +116,12 @@ export function catalogo({ operacoes } = {}) {
 // opcionais somados em todos os schemas strict, e 16 parâmetros com união (anyOf ou `type` em
 // lista). Acima disso o request é recusado inteiro, com 400.
 //
-// O catálogo inteiro passa longe: 29 ferramentas, 62 opcionais, 3 uniões. Com `strict` em todas, o
-// motor pararia em TODOS os canais no dia em que a escrita fosse ligada — e o modo só leitura (10
-// ferramentas, 18 opcionais) cabe, o que esconderia o defeito justamente durante o rollout. Por isso
-// as ferramentas saem SEM `strict`, como no CRM (bind_tools sem strict): o zod (validarArgs) é a
-// autoridade e devolve ARGUMENTOS_INVALIDOS com os campos, que o modelo corrige na rodada seguinte.
+// O catálogo inteiro passa longe: 37 ferramentas, 65 opcionais, 3 uniões (desde a A2c). Com `strict`
+// em todas, o motor pararia em TODOS os canais no dia em que a escrita fosse ligada — e o modo só
+// leitura (11 ferramentas, 21 opcionais) cabe, o que esconderia o defeito justamente durante o
+// rollout. Por isso as ferramentas saem SEM `strict`, como no CRM (bind_tools sem strict): o zod
+// (validarArgs) é a autoridade e devolve ARGUMENTOS_INVALIDOS com os campos, que o modelo corrige na
+// rodada seguinte.
 //
 // Se o `strict` voltar, ele volta por operação, escolhido de forma determinística (a `versao` e o
 // cache dependem disso) — e o teste reflexivo mede este orçamento sobre ferramentasClaude() nos dois
