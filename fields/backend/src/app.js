@@ -1,6 +1,8 @@
-// criarApp({config, db, estado}) monta o Express sem abrir porta nem banco: o teste injeta um db
+// criarApp({config, db, estado, motor?}) monta o Express sem abrir porta nem banco: o teste injeta um db
 // falso e roda sem Postgres. O bootstrap (server.js) passa o pool real e o `estado` que o initDB
 // leu do banco ({comentariosMigrados}: a migração comentarios_v1 rodou ou não — ver db/schema.js).
+// `motor` é a costura do chat (A2b): o teste troca por ele o modelo e a persistência do agente
+// (rotas/agente.js); sem ele, o modelo sai da config e a persistência é o banco.
 //
 // Ordem: log de request → rotas públicas (health, login) → exigirAuth → JSON → rotas protegidas
 // → tratador de erro. Sem pacote cors e sem cabeçalho CORS nenhum: o front chega pela mesma
@@ -28,7 +30,7 @@ export const ROTAS_PUBLICAS = Object.freeze(["GET /api/health", "POST /api/auth/
 
 const PG_CODIGO = /^[0-9A-Z]{5}$/; // SQLSTATE: seguro de logar, ao contrário da mensagem do pg
 
-export function criarApp({ config, db, estado, limitador = criarLimitador() } = {}) {
+export function criarApp({ config, db, estado, limitador = criarLimitador(), motor } = {}) {
   if (!config) throw new TypeError("criarApp: config é obrigatória");
   if (!db) throw new TypeError("criarApp: db é obrigatório");
   // Sem default: um app que "achasse" o modo dos comentários leria de um lugar e escreveria em outro.
@@ -46,7 +48,7 @@ export function criarApp({ config, db, estado, limitador = criarLimitador() } = 
     rotasEntradas({ db, estado }), rotasProjetos({ db, estado }), rotasReunioes({ db, estado }),
     rotasComentarios({ db, estado }), rotasHistorico({ db, estado }),
     // A2: a ontologia (catálogo, operações, prompt) e o que a tela pede ao agente sem o modelo.
-    rotasOps({ db, estado }), rotasOntologia(), rotasAgente({ db, estado }),
+    rotasOps({ db, estado }), rotasOntologia(), rotasAgente({ db, estado, config, motor }),
   ];
   const tabela = tabelaDeRotas("/api", [...publicas, ...protegidas]);
   const rotaDe = (req) => rotaDaTabela(req, tabela);

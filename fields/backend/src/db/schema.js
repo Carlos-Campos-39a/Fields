@@ -1,9 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
 import { log } from "../lib/log.js";
 import { hojeISO, somarDias } from "../lib/datas.js";
-import { ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, ENTIDADES, MEMORIA_ATIVA, ORIGENS, STATUS_MEMORIA } from "../dominio/enums.js";
+import {
+  ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, ENTIDADES, MEMORIA_ATIVA, ORIGENS, ROLES_MENSAGEM, SESSAO_ATIVA,
+  STATUS_MEMORIA, STATUS_SESSAO,
+} from "../dominio/enums.js";
 import { MEMORIA_TEXTO_MAX } from "../dominio/limites.js";
 import { aplicarMigracoes } from "./migracoes.js";
+import { recuperarOrfaosSemFalhar } from "../servicos/turnos.js";
 
 // Schema e seed. Tudo idempotente: roda a cada boot, e um statement que falha DERRUBA o boot (o
 // healthcheck do Railway segura o deploy anterior no ar). Migração de DADO é outra coisa: mora em
@@ -176,6 +180,55 @@ export const DDL_A2 = `
     CREATE INDEX IF NOT EXISTS agente_turnos_criado_idx ON agente_turnos (criado_em DESC);
 `;
 
+// ─── A2b: o motor do agente — aditivo; a DDL_A2 acima fica como estava ───
+//
+// agente_sessoes: uma conversa do motor com o modelo, por canal. UMA ativa por canal (índice único
+// parcial): duas instâncias no ar ao mesmo tempo (a sobreposição de um deploy no Railway) não abrem
+// duas conversas paralelas. `prompt_versao` é o hash do system + ferramentas que a sessão usou — se
+// mudar, a próxima mensagem abre outra (agente/sessoes.js). `motivo` diz por que ela acabou.
+//
+// agente_mensagens: o histórico EXATO que vai ao modelo, uma linha por mensagem, só INSERT. `content`
+// é TEXT com o JSON como saiu da API (não jsonb): o pensamento preservado do Opus 5.5 amarra cada
+// bloco de thinking aos bytes de tudo o que veio antes, e o jsonb normaliza (reordena chaves, tira
+// espaço, muda número). O TEXT devolve o que entrou. Sem UPDATE e sem DELETE em lugar nenhum — a
+// varredura de test/sessoes.test.js cobra.
+//
+// agente_turnos ganha o que o motor escreve no fim do turno: `motivo` (por que acabou como acabou),
+// `resposta` (o texto mostrado) e `metricas` (chamadas, tools, tokens, duração). Os índices servem a
+// consulta da conversa (canal, criado_em) e a da sessão.
+export const DDL_A2B = `
+    CREATE TABLE IF NOT EXISTS agente_sessoes (
+      id                  TEXT PRIMARY KEY,
+      canal               TEXT        NOT NULL CONSTRAINT agente_sessoes_canal_check CHECK (canal IN (${listaSql(CANAIS)})),
+      prompt_versao       TEXT        NOT NULL,
+      modelo              TEXT        NOT NULL,
+      status              TEXT        NOT NULL DEFAULT '${SESSAO_ATIVA}' CONSTRAINT agente_sessoes_status_check CHECK (status IN (${listaSql(STATUS_SESSAO)})),
+      motivo              TEXT,
+      n_mensagens         INTEGER     NOT NULL DEFAULT 0,
+      ultimo_input_tokens INTEGER     NOT NULL DEFAULT 0,
+      criado_em           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ultima_atividade_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      encerrado_em        TIMESTAMPTZ
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS agente_sessoes_uma_ativa_idx ON agente_sessoes (canal) WHERE status = '${SESSAO_ATIVA}';
+
+    CREATE TABLE IF NOT EXISTS agente_mensagens (
+      sessao_id  TEXT        NOT NULL REFERENCES agente_sessoes(id),
+      seq        INTEGER     NOT NULL,
+      role       TEXT        NOT NULL CONSTRAINT agente_mensagens_role_check CHECK (role IN (${listaSql(ROLES_MENSAGEM)})),
+      content    TEXT        NOT NULL,
+      turno_id   TEXT,
+      criado_em  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (sessao_id, seq)
+    );
+
+    ALTER TABLE agente_turnos ADD COLUMN IF NOT EXISTS motivo   TEXT;
+    ALTER TABLE agente_turnos ADD COLUMN IF NOT EXISTS resposta TEXT;
+    ALTER TABLE agente_turnos ADD COLUMN IF NOT EXISTS metricas JSONB;
+    CREATE INDEX IF NOT EXISTS agente_turnos_sessao_idx ON agente_turnos (sessao_id);
+    CREATE INDEX IF NOT EXISTS agente_turnos_canal_criado_idx ON agente_turnos (canal, criado_em);
+`;
+
 /**
  * Schema → seed → migrações de dado. Devolve o `estado` que o app precisa saber do banco:
  * {comentariosMigrados} — false quando a migração comentarios_v1 falhou (MIGRACAO_FALHOU no log),
@@ -185,6 +238,7 @@ export async function initDB(db) {
   await db.query(DDL_BASE);
   await db.query(DDL_A1);
   await db.query(DDL_A2);
+  await db.query(DDL_A2B);
 
   // Seed if empty (conta também as excluídas: excluir tudo não ressemeia o banco)
   const { rows } = await db.query("SELECT COUNT(*) FROM entries");
@@ -212,6 +266,9 @@ export async function initDB(db) {
   }
 
   const estado = await aplicarMigracoes(db);
+  // Dado, não schema: como as migrações, a falha aqui não derruba o boot (o log é que avisa). É a
+  // 1ª passada; o server.js agenda as seguintes (o órfão de uma queda ainda é recente neste boot).
+  await recuperarOrfaosSemFalhar(db, { momento: "boot" });
   log.info("DB_PRONTO", { comentarios_migrados: estado.comentariosMigrados });
   return estado;
 }
