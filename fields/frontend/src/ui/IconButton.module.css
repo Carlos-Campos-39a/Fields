@@ -45,3 +45,11 @@
   background: var(--surface-2);
   color: var(--text);
 }
+
+/* tone="danger": o mesmo peso do .botao:hover, e vem depois dele no arquivo — vence pela ordem
+   DENTRO deste módulo, que não muda com a ordem em que as telas importam o CSS. Uma tela pode
+   deixar o repouso mais discreto (--text-3) com a própria classe sem perder este hover. */
+.perigo:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

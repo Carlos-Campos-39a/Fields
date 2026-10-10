@@ -1,0 +1,241 @@
+/*
+ * Edição de uma entrada (entries/EditForm.jsx). Só tokens, nos dois temas: os seletores de data e
+ * hora seguem o tema pelo color-scheme do tokens.css (nada de colorScheme forçado no componente).
+ * Título e conteúdo em Lora, como na leitura — o que se edita tem a cara do que se lê.
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 var(--sp-5) var(--sp-7);
+  font-family: var(--font-ui);
+  color: var(--text);
+  animation: entrar var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Cabeçalho grudado no topo do painel que rola: Salvar e Cancelar nunca saem de alcance, nem no
+   celular com o teclado aberto. */
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: var(--sp-6) 0 var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.acoes {
+  display: flex;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.grupo {
+  min-width: 0;
+  border: 0;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.rotulo {
+  display: block;
+  padding: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* <legend> não entra no gap do flex: o respiro dele é margem. */
+.grupo .rotulo {
+  margin-bottom: var(--sp-2);
+}
+
+.entrada {
+  width: 100%;
+  min-height: 40px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  transition: border-color var(--dur-fast) ease;
+}
+
+/* 16px no celular: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo, e a casca
+   (100dvh, overflow hidden) não volta sozinha. Fica AQUI, antes de .titulo e .conteudo, e não no
+   bloco do celular do fim do arquivo: com a mesma especificidade vence quem vem depois, e lá ela
+   derrubaria o título de 20px para 16px. */
+@media (max-width: 767.98px) {
+  .entrada {
+    font-size: var(--fs-md);
+  }
+}
+
+.entrada::placeholder {
+  color: var(--text-3);
+}
+
+@media (hover: hover) {
+  .entrada:hover {
+    border-color: var(--decorative);
+  }
+}
+
+/* Campo de texto sempre mostra o anel quando focado (o navegador trata como foco de teclado). */
+.entrada:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+}
+
+.conteudo {
+  min-height: 200px;
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  line-height: var(--lh-reading);
+  resize: vertical;
+}
+
+.invalido,
+.invalido:hover {
+  border-color: var(--danger);
+}
+
+.erro {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+  color: var(--danger);
+}
+
+.dica {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+  color: var(--text-3);
+}
+
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.linha > .campo {
+  flex: 1 1 160px;
+}
+
+/* ── Tipo: rádios nativos com cara de chip ───────────────────────────────────────────── */
+.tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.opcao {
+  position: relative;
+  display: inline-flex;
+}
+
+/* O rádio fica no lugar (foco, setas, leitor de tela), invisível sobre o chip. */
+.radio {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.chipIcone {
+  display: inline-flex;
+  font-size: var(--fs-xs); /* a bandeira (emoji) dos tipos de língua */
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .opcao:hover .chip {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+/* Marcado: borda e fundo de acento (preenchimento) + texto --text em 600 — a cor não é o único
+   sinal. */
+.radio:checked + .chip {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+
+.radio:focus-visible + .chip {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767.98px) {
+  .form {
+    padding: 0 var(--sp-4) var(--sp-6);
+  }
+
+  .cabecalho {
+    padding-top: var(--sp-4);
+  }
+}

@@ -1,0 +1,95 @@
+/* Barra do topo do painel (layout/TopBar.jsx). Só tokens. 56px: alinha com a marca da Sidebar. */
+
+.barra {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: 56px;
+  padding: 0 var(--sp-4) 0 var(--sp-5);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.titulo {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/* Títulos em Lora (plano §4). */
+.vista {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.separador {
+  color: var(--text-3);
+}
+
+.entrada {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+/* ── Lista / Cards: controle segmentado com dois Button ghost ─────────────────────────── */
+.exibicao {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* Duas classes: vence o .sm e o raio do Button. O raio de dentro é o de fora menos o recuo. */
+.exibicao .opcao {
+  height: 26px;
+  padding: 0 var(--sp-2);
+  border-radius: calc(var(--radius-sm) - 2px);
+  font-size: var(--fs-sm);
+}
+
+/* A opção ligada (aria-pressed) é o "ligado" do próprio Button ghost: --surface-2 e --text. */
+
+.passos,
+.conta {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.conta {
+  gap: var(--sp-1);
+  margin-left: var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border);
+}
+
+@media (max-width: 767.98px) {
+  .barra {
+    gap: var(--sp-1);
+    padding: 0 var(--sp-2);
+  }
+
+  .titulo {
+    padding-left: var(--sp-2);
+  }
+}

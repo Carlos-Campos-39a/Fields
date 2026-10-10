@@ -1,0 +1,164 @@
+/*
+ * Cartão de reunião da Agenda (agenda/MeetingCard.jsx). Só tokens: serve nos dois temas.
+ * O âmbar do Must era cor fixa à mão; aqui é o tom warning: fundo --warning-soft, ícone em
+ * --warning-ink (o --warning puro não chega a 3:1 sobre o claro) e o texto em --text/--text-2 —
+ * nunca a cor do tom como texto.
+ */
+
+.cartao {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) ease;
+}
+
+.cartao:hover,
+.aberto {
+  border-color: var(--border-strong);
+}
+
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-1) var(--sp-2) var(--sp-2);
+}
+
+/* O cabeçalho inteiro é o botão de abrir/fechar; o anel de foco vem do :focus-visible global. */
+.alternar {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.horario {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+/* Reunião de hoje: o horário em --accent-ink (4,7:1 no claro), nunca no --accent puro. */
+.horarioHoje {
+  color: var(--accent-ink);
+}
+
+.titulo {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.mustPrevia {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+.mustTexto {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.iconeMust {
+  margin-top: 2px;
+  color: var(--warning-ink);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+/* ── Aberta ───────────────────────────────────────────────────────────────── */
+.painel {
+  border-top: 1px solid var(--border);
+}
+
+.secaoNotas {
+  padding: var(--sp-3) var(--sp-2);
+}
+
+.secaoMust {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2);
+  border-top: 1px solid var(--border);
+  background: var(--warning-soft);
+}
+
+.rotuloMust {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.rotuloMust .iconeMust {
+  margin-top: 0;
+}
+
+/* O Must é texto do Carlos para ler na reunião: Lora, como o corpo das notas. */
+.campoMust {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  resize: vertical;
+}
+
+.campoMust::placeholder {
+  color: var(--text-3);
+}
+
+.campoMust:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* ── Celular ──────────────────────────────────────────────────────────────── */
+/* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo, e a casca (100dvh,
+   overflow hidden) não volta sozinha. */
+@media (max-width: 767.98px) {
+  .campoMust {
+    font-size: var(--fs-md);
+  }
+}

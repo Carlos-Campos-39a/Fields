@@ -5,7 +5,7 @@ export { Button, BUTTON_SIZES, BUTTON_VARIANTS } from "./Button.jsx";
 export { ConfirmDialog } from "./ConfirmDialog.jsx";
 export { EmptyState } from "./EmptyState.jsx";
 export { Icon, ICON_NAMES } from "./icons.jsx";
-export { IconButton } from "./IconButton.jsx";
+export { IconButton, ICONBUTTON_TONES } from "./IconButton.jsx";
 export { Logo } from "./Logo.jsx";
 export { Popover, PopoverItem, calcularPosicao } from "./Popover.jsx";
 export { SectionLabel } from "./SectionLabel.jsx";

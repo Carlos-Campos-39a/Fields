@@ -1,6 +1,7 @@
 /**
- * Monograma F' do Fields' — os mesmos traços do LogoIcon do App.jsx, agora em currentColor, sem
- * gradiente nem brilho. A cor vem de quem usa (ex.: `style={{ color: "var(--accent)" }}`).
+ * Monograma F' do Fields' — os mesmos traços do LogoIcon do App.jsx antigo, agora em currentColor,
+ * sem gradiente nem brilho. A cor vem de quem usa: uma classe com `color: var(--accent)` no pai
+ * ou no próprio Logo (`className`).
  * Decorativo por padrão; com `title`, vira role="img" com nome acessível.
  */
 export function Logo({ size = 20, title, className, ...rest }) {

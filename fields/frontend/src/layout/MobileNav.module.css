@@ -1,0 +1,83 @@
+/* Barra inferior do celular (layout/MobileNav.jsx). Só tokens. Mínima: a R4 a redesenha. */
+
+.barra {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-around;
+  padding: var(--sp-1) var(--sp-1) calc(var(--sp-1) + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+/* Serve ao <a> das vistas e ao <button> do "Mais": zera o que cada um traz do navegador. */
+.item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 52px;
+  padding: var(--sp-1) 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-fast) ease;
+}
+
+/* Só com ponteiro de verdade: no toque o :hover gruda no último item tocado. */
+@media (hover: hover) {
+  .item:hover {
+    color: var(--text);
+  }
+}
+
+/* O anel por dentro: colado na borda da tela, o de fora ficaria cortado. */
+.item:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Vista atual: texto em --text com peso; o laranja só no ícone (como ícone ele é permitido no
+   claro; como texto pequeno, não). */
+.item[aria-current="page"] {
+  color: var(--text);
+}
+
+.item[aria-current="page"] .rotulo {
+  font-weight: var(--fw-semibold);
+}
+
+.item[aria-current="page"] .icone {
+  color: var(--accent);
+}
+
+.item[aria-expanded="true"] {
+  color: var(--text);
+}
+
+.rotulo {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Menu "Mais" ──────────────────────────────────────────────────────────────────────── */
+.divisor {
+  margin: var(--sp-1) 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.secao {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+}

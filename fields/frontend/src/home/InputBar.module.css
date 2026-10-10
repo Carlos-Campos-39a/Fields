@@ -1,0 +1,177 @@
+/* Caixa de captura (home/InputBar.jsx). Só tokens; borda de 1px, sem sombra. */
+
+.raiz {
+  flex-shrink: 0;
+}
+
+/* Faixa do rodapé de #/notas. */
+.comBorda {
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.coluna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ── Tarefa vinculada ─────────────────────────────────────────────────────────────────── */
+.vinculo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.vinculoRotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 0 0 var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.caminho {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sep {
+  color: var(--text-3);
+}
+
+.tarefa {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* ── A caixa ──────────────────────────────────────────────────────────────────────────── */
+.caixa {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--dur-fast) ease;
+}
+
+.caixa:hover {
+  border-color: var(--text-3);
+}
+
+/* Foco: a caixa ganha o anel (borda + 1px de contorno = 2px em --focus-ring). O textarea perde
+   o próprio, que ficaria colado no texto. */
+.caixa:focus-within {
+  border-color: var(--focus-ring);
+  outline: 1px solid var(--focus-ring);
+}
+
+.texto {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  max-height: 160px;
+  padding: 7px 0;
+  overflow-y: auto;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  resize: none;
+  /* Cresce com o texto onde o navegador sabe (Chrome 123+); no resto, rola dentro dos 160px. */
+  field-sizing: content;
+}
+
+.texto:focus,
+.texto:focus-visible {
+  outline: none;
+}
+
+.texto::placeholder {
+  color: var(--text-3);
+}
+
+.acoes {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* Enviar: o Button primário (tinta invertida) quadrado. Duas classes: vence o .md do Button. */
+.acoes .enviar {
+  width: 36px;
+  padding: 0;
+}
+
+/* ── Linha de baixo: tipo detectado + dica de teclado ─────────────────────────────────── */
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 22px;
+  padding: 0 var(--sp-1);
+}
+
+.deteccao {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.vaiComo {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.dica {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+  .comBorda {
+    padding: var(--sp-2) var(--sp-4);
+  }
+
+  /* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar a caixa. */
+  .texto {
+    font-size: var(--fs-md);
+  }
+
+  /* Teclado de celular não tem Alt+Enter. */
+  .dica {
+    display: none;
+  }
+}

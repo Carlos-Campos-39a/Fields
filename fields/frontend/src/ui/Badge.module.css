@@ -23,6 +23,18 @@
   line-height: 1;
   white-space: nowrap;
   vertical-align: middle;
+  /* Numa coluna estreita a pílula encolhe até a largura do pai, e o texto termina em "…". */
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* O texto agrupado (Badge.jsx). A altura de linha volta a --lh-base só aqui: com o 1 da pílula,
+   o overflow:hidden cortaria as descendentes (g, p, ç) do Poppins. Cabe nos 22px. */
+.texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--lh-base);
 }
 
 .ponto {

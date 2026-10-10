@@ -236,12 +236,42 @@
   height: 48px;
   border-radius: 11px;
   background: var(--accent);
-  color: #faf9f5;
+  color: var(--logo-tinta);
 }
 
 .borda {
   display: flex;
   justify-content: flex-end;
+}
+
+/* Os pesos da amostra de tipo (eram style inline). */
+.peso400 {
+  font-weight: var(--fw-regular);
+}
+
+.peso500 {
+  font-weight: var(--fw-medium);
+}
+
+.peso600 {
+  font-weight: var(--fw-semibold);
+}
+
+.popoverExemplo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+}
+
+.popoverTexto {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+/* Ícone e logo em laranja: preenchimento, não texto — o --accent puro é permitido. */
+.acento {
+  color: var(--accent);
 }
 
 @media (max-width: 640px) {

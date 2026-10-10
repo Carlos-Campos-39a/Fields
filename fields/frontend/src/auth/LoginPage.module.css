@@ -1,0 +1,114 @@
+/* Tela de login (auth/LoginPage.jsx). Só tokens: segue o tema claro/escuro do <html>. */
+
+.tela {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topo {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.centro {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4) var(--sp-4) var(--sp-7);
+}
+
+/* Cartão = borda de 1px, sem sombra (sombra só em sobreposição). */
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 360px;
+  padding: var(--sp-6) var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* O laranja como ÍCONE (permitido no claro); nunca como texto pequeno. */
+.logo {
+  color: var(--accent);
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.sub {
+  margin-top: calc(-1 * var(--sp-2));
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.rotulo {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text);
+}
+
+/* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo. */
+.campo {
+  height: 40px;
+  padding: 0 var(--sp-3);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+  transition: border-color var(--dur-fast) ease;
+}
+
+.campo:hover {
+  border-color: var(--text-3);
+}
+
+.campo:focus-visible {
+  border-color: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.campo[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.erro {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--danger);
+}
+
+.entrar {
+  width: 100%;
+}

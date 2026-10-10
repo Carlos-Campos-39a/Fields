@@ -18,7 +18,8 @@
  * recalculado pelo tamanho para o traço sair com 1,5px na tela em qualquer `size`.
  * Cor: currentColor. Decorativo por padrão (aria-hidden); com `title`, vira role="img".
  */
-import { avisarUmaVez } from "./util.js";
+import styles from "./icons.module.css";
+import { avisarUmaVez, cx } from "./util.js";
 
 const DESENHOS = {
   home: (
@@ -61,6 +62,15 @@ const DESENHOS = {
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M9 3v18" />
       <path d="M15 3v18" />
+    </>
+  ),
+  // Lucide layout-grid: a vista de Cards (columns já é o kanban).
+  grid: (
+    <>
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
     </>
   ),
   message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
@@ -197,8 +207,7 @@ export function Icon({ name, size = 16, stroke = 1.5, title, className, ...rest 
       strokeLinecap="round"
       strokeLinejoin="round"
       focusable="false"
-      className={className}
-      style={{ flexShrink: 0 }}
+      className={cx(styles.icone, className)}
       {...acessivel}
       {...rest}
     >

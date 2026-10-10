@@ -1,0 +1,6 @@
+/* O <svg> do Icon (icons.jsx). Era flexShrink 0 em estilo inline: num botão ou numa linha flex
+   apertada o ícone não encolhe — o texto ao lado é que termina em "…". Uma classe, e não estilo
+   inline, para que quem precise (raro) possa mudar com a própria classe. */
+.icone {
+  flex-shrink: 0;
+}

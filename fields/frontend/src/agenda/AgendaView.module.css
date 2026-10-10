@@ -1,0 +1,430 @@
+/*
+ * Agenda (agenda/AgendaView.jsx). Só tokens: serve nos dois temas — no monólito eram cinzas,
+ * brancos translúcidos, um laranja e um âmbar fixos dentro de um tema escuro forçado.
+ *
+ * Desktop: a grade dos sete dias, que rola na horizontal só se não couber. A coluna mínima é 128px
+ * porque a semana TEM de caber em 1280px, o desktop do plano: 1280 − 264 (barra lateral) − 48 (o
+ * respiro lateral da .rolagem) − 8 (a barra de rolagem vertical do painel) = 960px, e a grade pede
+ * 7 × 128 + 6 × 8 (gap) = 944px. Com 136px ela pedia 1000px, e o domingo saía cortado.
+ * Celular (< 768px): um dia por vez; a fileira dos sete dias fica no cabeçalho, que gruda no topo.
+ * O hoje é marcado pela borda --accent e pelo número num círculo --accent com --on-fill — o
+ * laranja nunca é texto pequeno sobre o claro.
+ */
+
+.tela {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+/* ── Cabeçalho (gruda no topo enquanto a semana rola) ─────────────────────── */
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-4);
+  padding: var(--sp-6) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.titulos {
+  min-width: 0;
+}
+
+.tituloTela {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+
+.rotuloSemana {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.spinner {
+  color: var(--text-3);
+}
+
+.navegacao {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* "Hoje" na altura dos botões de seta (32px). Dois níveis de classe: vence o .sm do Button. */
+.navegacao .hoje {
+  height: 32px;
+}
+
+.alerta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin: var(--sp-4) var(--sp-5) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+/* ── Grade da semana ──────────────────────────────────────────────────────── */
+.rolagem {
+  flex: 1;
+  overflow-x: auto;
+  padding: var(--sp-4) var(--sp-5) var(--sp-6);
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(128px, 1fr)); /* a conta está no cabeçalho do arquivo */
+  gap: var(--sp-2);
+}
+
+.umDia {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dia {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 280px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  overflow: hidden;
+}
+
+.diaHoje {
+  border-color: var(--accent);
+}
+
+.cabecalhoDia {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  font-weight: var(--fw-regular);
+}
+
+.nomeDia {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.numeroDia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.diaHoje .nomeDia {
+  color: var(--accent-ink);
+}
+
+/* Preenchimento colorido leva --on-fill nos dois temas (tokens.css). */
+.diaHoje .numeroDia {
+  background: var(--accent);
+  color: var(--on-fill);
+}
+
+/* ── Resumo do dia: Musts e notas ─────────────────────────────────────────── */
+.musts,
+.notas {
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.musts {
+  background: var(--warning-soft);
+}
+
+.resumoTitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* O --warning puro não chega a 3:1 sobre o claro; o ícone usa a tinta. */
+.iconeMust {
+  color: var(--warning-ink);
+}
+
+.resumoLista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  list-style: none;
+}
+
+.resumoReuniao {
+  display: block;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Must e nota são texto do Carlos: Lora, para ler. */
+.resumoMust,
+.resumoNota {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  overflow-wrap: anywhere;
+}
+
+.resumoMust {
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  color: var(--text);
+}
+
+.resumoNota {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: var(--text-2);
+}
+
+.mais {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* ── Reuniões do dia ──────────────────────────────────────────────────────── */
+.reunioes {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+}
+
+.listaReunioes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  list-style: none;
+}
+
+.semReunioes {
+  padding: var(--sp-4) var(--sp-2);
+  font-size: var(--fs-sm);
+  text-align: center;
+  color: var(--text-3);
+}
+
+/* "+ Reunião": o Button ghost com a borda tracejada de "lugar para mais um". Dois níveis de
+   classe para vencer a borda transparente do .botao. */
+.reunioes .adicionar {
+  width: 100%;
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+/* ── Formulário de nova reunião ───────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+/* Sem color-scheme aqui: o seletor de hora nativo herda o do tema (tokens.css). */
+.campo {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.campo::placeholder {
+  color: var(--text-3);
+}
+
+.campo:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.horas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--sp-2);
+}
+
+.campoHora {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.rotuloHora {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+}
+
+.acoesForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+/* ── Fileira dos dias (só celular) ────────────────────────────────────────── */
+.dias {
+  display: grid;
+  flex-basis: 100%;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.botaoDia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--sp-1) 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.botaoDia:hover {
+  background: var(--surface-2);
+}
+
+.botaoDiaNome {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.botaoDiaNumero {
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.botaoDiaHoje .botaoDiaNome,
+.botaoDiaHoje .botaoDiaNumero {
+  color: var(--accent-ink);
+}
+
+/* Escolhido: tinta invertida, como o botão primário (17,5:1 claro, 15,8:1 escuro). */
+.botaoDiaSel,
+.botaoDiaSel:hover {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+.botaoDiaSel .botaoDiaNome,
+.botaoDiaSel .botaoDiaNumero {
+  color: var(--primary-fg);
+}
+
+/* Ponto de "tem reunião": decorativo (o leitor de tela recebe a contagem em texto). */
+.ponto {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.pontoCheio {
+  background: var(--accent);
+}
+
+/* ── Celular ──────────────────────────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+  .cabecalho {
+    padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  }
+
+  .alerta {
+    margin: var(--sp-3) var(--sp-4) 0;
+  }
+
+  .rolagem {
+    padding: var(--sp-3) var(--sp-4) var(--sp-5);
+  }
+
+  .dia {
+    min-height: 0;
+  }
+
+  /* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo, e a casca (100dvh,
+     overflow hidden) não volta sozinha. */
+  .campo {
+    height: 40px;
+    font-size: var(--fs-md);
+  }
+}

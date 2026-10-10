@@ -1,0 +1,226 @@
+/*
+ * As células editáveis da tabela de projetos: EditableCell, DateCell, HolderToggle, StatusPicker e
+ * o balão de comentários (TaskComments). Só tokens; o :hover mora aqui, não em handler de mouse no JSX.
+ * O anel de foco é o global (base.css, :focus-visible) — só o recuo muda nos campos.
+ */
+
+/* ── Texto que vira campo no clique (EditableCell, DateCell) ───────────── */
+.exibicao {
+  display: block;
+  padding: 2px var(--sp-1);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  line-height: var(--lh-base);
+  overflow-wrap: anywhere;
+  cursor: text;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.exibicao:hover {
+  background: var(--surface-2);
+}
+
+/* Variantes de tamanho — valem para a exibição E para o campo, para o texto não pular. */
+.projeto {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+}
+
+.frente {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.texto {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+}
+
+/* Depois das variantes: o vazio e o riscado ganham na cor. --text-3 passa 4,5:1 nos dois temas;
+   --decorative não seria texto no claro. */
+.vazio {
+  color: var(--text-3);
+}
+
+.riscado {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.campo {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  /* 1px de borda + 1px/3px = os 2px/4px da exibição: abrir o campo não mexe o texto. */
+  padding: 1px calc(var(--sp-1) - 1px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  line-height: var(--lh-base);
+}
+
+.campo::placeholder {
+  color: var(--text-3);
+  opacity: 1;
+}
+
+/* Anel sobre a borda: a célula é estreita, e o recuo padrão (2px) invadiria a vizinha. */
+.campo:focus-visible {
+  outline-offset: -1px;
+}
+
+/* ── Prazo (DateCell) ──────────────────────────────────────────────────── */
+.prazo {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+/* Prazo de antes do campo de data ("sexta", "fim do mês"): aparece como veio, em itálico. */
+.legado {
+  font-style: italic;
+  color: var(--text-2);
+}
+
+/* O seletor nativo segue o tema pelo color-scheme herdado do <html> — nada força o escuro aqui. */
+.campoData {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Holder (HolderToggle) ─────────────────────────────────────────────── */
+/* Ponto + rótulo. O ponto é cor de preenchimento (acento, azul) e o texto nunca é o laranja: a
+   diferença entre os três estados está no TEXTO, a cor só reforça. */
+.holder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px var(--sp-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.holder:hover {
+  background: var(--surface-2);
+}
+
+.holderPonto {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.holder[data-estado="outro"] {
+  color: var(--text-2);
+}
+
+.holder[data-estado="outro"] .holderPonto {
+  background: var(--info);
+}
+
+.holder[data-estado="vazio"] {
+  color: var(--text-3);
+}
+
+.holder[data-estado="vazio"] .holderPonto {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.holderTexto {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── Status (StatusPicker) ─────────────────────────────────────────────── */
+/* O próprio StatusBadge é o gatilho; o :hover desenha um anel em volta da pílula. */
+.gatilhoStatus {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  transition: box-shadow var(--dur-fast) ease;
+}
+
+.gatilhoStatus:hover,
+.gatilhoStatus[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 3px var(--border-strong);
+}
+
+/* ── Comentários da tarefa (TaskComments) ──────────────────────────────── */
+.comentarios {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+/* Com comentários: o ícone vai para o acento (ícone pode; o número fica em --text-2). */
+.comentarios[data-tem="sim"] {
+  color: var(--text-2);
+}
+
+.comentarios[data-tem="sim"] .comentariosIcone {
+  color: var(--accent);
+}
+
+/* Depois do data-tem: no hover o texto sobe para --text, com ou sem comentários. */
+.comentarios:hover,
+.comentarios[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.fioComentarios {
+  padding: var(--sp-2);
+}
+
+/* ── Celular ──────────────────────────────────────────────────────────────── */
+/* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo, e a casca (100dvh,
+   overflow hidden) não volta sozinha. Duas classes: o campo leva junto a variante de tamanho
+   (.texto 13px, .frente 13px, .projeto 14px), e com uma só quem decidiria seria a ordem no bundle.
+   Aqui o "texto não pula ao abrir o campo" das variantes cede de propósito: no celular, um texto
+   que cresce 3px ao abrir é bem menos ruim que a página presa em zoom. */
+@media (max-width: 767.98px) {
+  .campo.texto,
+  .campo.frente,
+  .campo.projeto,
+  .campo.campoData {
+    font-size: var(--fs-md);
+  }
+}
