@@ -41,6 +41,12 @@ export function toEntry(row, threads) {
 
 const vazioViraNull = (v) => (v === "" || v === undefined ? null : v);
 
+/** Texto longo numa lista do agente vai cortado: a lista é para escolher, não para ler inteiro. */
+export function trecho(texto, max = 200) {
+  const t = String(texto ?? "");
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
 /** Linha de tarefa (com frente_nome, projeto_id e projeto_nome do JOIN) → tarefa do agente. */
 export function tarefaDoAgente(r) {
   return {
@@ -55,12 +61,11 @@ export function tarefaDoAgente(r) {
 
 /** Linha de entries → entrada do agente. O conteúdo vai como trecho: a lista é para escolher. */
 export function entradaDoAgente(r) {
-  const conteudo = r.content ?? "";
   return {
     entrada_id: r.id, tipo: r.type, titulo: r.title,
     data: vazioViraNull(r.date), hora: vazioViraNull(r.time),
     tags: r.tags ?? [], fixada: Boolean(r.pinned),
-    trecho: conteudo.length > 200 ? `${conteudo.slice(0, 200)}…` : conteudo,
+    trecho: trecho(r.content),
   };
 }
 
@@ -73,9 +78,16 @@ export function reuniaoDoAgente(m) {
   };
 }
 
-/** Array legado de comentários ({text, createdAt|created_at}) → [{texto, criado_em}]. */
+/**
+ * Array legado de comentários ({id, text, createdAt|created_at}) → [{comentario_id, texto, criado_em}].
+ *
+ * A2c: o id vai junto. Sem ele o modelo não tem como excluir o comentário que o Carlos apontou
+ * (ExcluirComentario) — e acabaria perguntando o id, o que o prompt proíbe. No modo legado o id é o
+ * do item jsonb (pode ser número: vira texto), e a exclusão recusa com COMENTARIOS_INDISPONIVEIS.
+ */
 export function comentariosDoAgente(lista) {
   return (Array.isArray(lista) ? lista : []).map((c) => ({
+    comentario_id: c?.id == null ? null : String(c.id),
     texto: c?.text ?? "", criado_em: c?.createdAt ?? c?.created_at ?? null,
   }));
 }

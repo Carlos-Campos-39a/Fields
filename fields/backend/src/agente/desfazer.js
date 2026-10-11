@@ -42,7 +42,7 @@ import * as turnos from "../servicos/turnos.js";
 
 // ── O inverso de cada escrita ───────────────────────────────────────────────────────────────────
 //
-//   EXCLUIR   — a escrita CRIOU o registro; o inverso é a exclusão lógica.
+//   EXCLUIR   — a escrita CRIOU (ou RESTAUROU) o registro; o inverso é a exclusão lógica.
 //   RESTAURAR — a escrita EXCLUIU o registro; o inverso apaga o carimbo (a árvore volta junto).
 //   REVERTER  — a escrita ALTEROU campos; o estado anterior vem do `historico` (os valores `de` do
 //               evento que a escrita gravou). Não há snapshot próprio, e não deve haver: dois
@@ -69,6 +69,15 @@ export const INVERSOS = {
   ExcluirFrente: "RESTAURAR",
   ExcluirTarefa: "RESTAURAR",
   ExcluirReuniao: "RESTAURAR",
+  ExcluirComentario: "RESTAURAR",
+  // A2c: desfazer um Restaurar* é excluir de novo — pelo mesmo serviço, com a mesma guarda da árvore
+  // (o que nasceu dentro do projeto depois de ele voltar segura o desfazer, como na criação).
+  RestaurarEntrada: "EXCLUIR",
+  RestaurarProjeto: "EXCLUIR",
+  RestaurarFrente: "EXCLUIR",
+  RestaurarTarefa: "EXCLUIR",
+  RestaurarReuniao: "EXCLUIR",
+  RestaurarComentario: "EXCLUIR",
   Lembrar: null,
   Esquecer: null,
 };

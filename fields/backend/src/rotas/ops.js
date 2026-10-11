@@ -28,6 +28,12 @@ const STATUS_DO_CODIGO = {
   AMBIGUO: 409,
   COMENTARIOS_INDISPONIVEIS: 409,
   COMENTARIOS_DESATUALIZADOS: 409,
+  // A2c: o pai excluído é conflito de ESTADO (restaurado o pai, o mesmo pedido passa); fora da
+  // Lixeira é "não há esse excluído", o 404 do restaurar. O escondido pelo pai também é ESTADO — o
+  // item existe e está fora da tela por causa do `pai` —, não ausência: 409, e não o 404 do vivo.
+  PAI_EXCLUIDO: 409,
+  ESCONDIDO_PELO_PAI: 409,
+  NAO_ESTA_NA_LIXEIRA: 404,
   ERRO_INTERNO: 500,
 };
 
