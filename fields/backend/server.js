@@ -7,6 +7,7 @@ import { initDB } from "./src/db/schema.js";
 import { criarApp } from "./src/app.js";
 import { log } from "./src/lib/log.js";
 import { REPARO_POS_DEPLOY_MS, repararDivergencia } from "./src/db/migracoes.js";
+import { agendarRecuperacaoDeOrfaos } from "./src/servicos/turnos.js";
 
 let config;
 try {
@@ -27,13 +28,22 @@ initDB(pool)
   .then((estado) => {
     const app = criarApp({ config, db: pool, estado });
     app.listen(config.porta, "0.0.0.0", () => {
-      log.info("SERVIDOR_NO_AR", { porta: config.porta });
+      // O estado do agente no boot: é a primeira pergunta diante de um 503 AGENTE_DESLIGADO (nunca a chave).
+      log.info("SERVIDOR_NO_AR", {
+        porta: config.porta,
+        agente_habilitado: config.agente.habilitado,
+        agente_modelo: config.agente.modeloFalso ? "modelo-falso" : config.agente.modelo,
+      });
       // A instância anterior (A0 na primeira subida, ou depois de um rollback) segue escrevendo no
       // jsonb até o healthcheck desta passar — e o reparo do boot já rodou. Uma segunda passada,
       // depois da sobreposição, recupera essas escritas. Nunca lança; unref() não segura o processo.
       if (estado.comentariosMigrados) {
         setTimeout(() => repararDivergencia(pool, { momento: "pos_deploy" }), REPARO_POS_DEPLOY_MS).unref();
       }
+      // Turno do agente que morreu com um processo: a passada do boot só pega o que já tem 5 min, e
+      // o da queda de agora há pouco (ou o da instância velha deste deploy) ainda não tem. A cada
+      // minuto, então — senão a tela mostraria "Trabalhando…" até o próximo deploy.
+      agendarRecuperacaoDeOrfaos(pool);
     });
   })
   .catch((err) => {

@@ -5,10 +5,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DDL_A1, DDL_A2, DDL_BASE, listaSql } from "../src/db/schema.js";
+import { DDL_A1, DDL_A2, DDL_A2B, DDL_BASE, listaSql } from "../src/db/schema.js";
 import {
   ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, COLUNAS_KANBAN, COLUNA_FEITO, ENTIDADES, MEMORIA_ARQUIVADA,
   MEMORIA_ATIVA, ORIGENS, STATUS, STATUS_CONCLUIDO, STATUS_MEMORIA, TIPOS_AGENDADOS, TIPOS_ENTRADA,
+  CANAIS_DO_MOTOR, ROLES_MENSAGEM, SESSAO_ATIVA, STATUS_SESSAO, STATUS_TURNO, TURNO_EM_ANDAMENTO,
 } from "../src/dominio/enums.js";
 import { MEMORIA_TEXTO_MAX } from "../src/dominio/limites.js";
 
@@ -104,4 +105,52 @@ test("enums da A2: os valores com nome são membros das listas, e todo canal é 
   // A escrita que chega por um canal grava histórico com a origem de mesmo nome.
   for (const canal of CANAIS) assert.ok(ORIGENS.includes(canal), canal);
   for (const lista of [TIPOS_ENTRADA, TIPOS_AGENDADOS, STATUS, COLUNAS_KANBAN, STATUS_MEMORIA, CANAIS]) assert.ok(Object.isFrozen(lista));
+});
+
+// ─── A2b · o motor: sessões, mensagens, e o que agente_turnos ganha ───
+
+test("A2b: os CHECKs de agente_sessoes e agente_mensagens são as listas dos enums", () => {
+  const checks = {
+    agente_sessoes_canal_check: ["canal", CANAIS],
+    agente_sessoes_status_check: ["status", STATUS_SESSAO],
+    agente_mensagens_role_check: ["role", ROLES_MENSAGEM],
+  };
+  for (const [nome, [coluna, valores]] of Object.entries(checks)) {
+    const esperado = `CONSTRAINT ${nome} CHECK (${coluna} IN (${listaSql(valores)}))`;
+    assert.ok(DDL_A2B.includes(esperado), `${nome}: ${esperado}`);
+  }
+  assert.equal((DDL_A2B.match(/CHECK \(/g) ?? []).length, Object.keys(checks).length, "nenhum CHECK fora da lista acima");
+  assert.ok(DDL_A2B.includes(`DEFAULT '${SESSAO_ATIVA}'`));
+  // Uma ativa por canal: o índice único parcial é a última trava contra duas conversas paralelas.
+  assert.ok(DDL_A2B.includes(`ON agente_sessoes (canal) WHERE status = '${SESSAO_ATIVA}'`));
+  assert.match(DDL_A2B, /CREATE UNIQUE INDEX IF NOT EXISTS \w+ ON agente_sessoes \(canal\)/);
+});
+
+test("A2b: content é TEXT (o JSON exato — jsonb normalizaria), a chave é (sessao_id, seq)", () => {
+  assert.match(DDL_A2B, /\bcontent\s+TEXT\s+NOT NULL/);
+  assert.doesNotMatch(DDL_A2B, /\bcontent\s+JSONB/i);
+  assert.match(DDL_A2B, /PRIMARY KEY \(sessao_id, seq\)/);
+  for (const coluna of ["motivo", "resposta", "metricas"]) {
+    assert.ok(DDL_A2B.includes(`ALTER TABLE agente_turnos ADD COLUMN IF NOT EXISTS ${coluna} `), coluna);
+  }
+  assert.match(DDL_A2B, /CREATE INDEX IF NOT EXISTS \w+ ON agente_turnos \(sessao_id\)/);
+  assert.match(DDL_A2B, /CREATE INDEX IF NOT EXISTS \w+ ON agente_turnos \(canal, criado_em\)/);
+});
+
+test("A2b é aditiva: só CREATE ... IF NOT EXISTS e ADD COLUMN IF NOT EXISTS, nada destrutivo; a DDL_A2 não mudou", () => {
+  assert.doesNotMatch(DDL_A2B, /\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bRENAME\b|\bTYPE\b/i);
+  assert.doesNotMatch(DDL_A2B, /CREATE (UNIQUE )?(TABLE|INDEX) (?!IF NOT EXISTS)/);
+  for (const alter of DDL_A2B.match(/ALTER TABLE[^;]*;/g) ?? []) assert.match(alter, /^ALTER TABLE agente_turnos ADD COLUMN IF NOT EXISTS /, alter);
+  assert.deepEqual([...DDL_A2B.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["agente_sessoes", "agente_mensagens"]);
+  assert.doesNotMatch(DDL_A2, /agente_sessoes|agente_mensagens|metricas/, "a A2b não reescreve a DDL_A2");
+});
+
+test("enums da A2b: o motor conversa em web e whatsapp (não no mcp), e os status de turno têm o EM_ANDAMENTO", () => {
+  assert.deepEqual([...CANAIS_DO_MOTOR], ["web", "whatsapp"]);
+  for (const canal of CANAIS_DO_MOTOR) assert.ok(CANAIS.includes(canal), canal);
+  assert.deepEqual([...STATUS_TURNO], ["EM_ANDAMENTO", "CONCLUIDO", "ESGOTADO", "FALHOU", "RECUSADO"]);
+  assert.equal(TURNO_EM_ANDAMENTO, "EM_ANDAMENTO");
+  assert.deepEqual([...STATUS_SESSAO], ["ATIVA", "ENCERRADA"]);
+  assert.deepEqual([...ROLES_MENSAGEM], ["user", "assistant"]);
+  for (const lista of [CANAIS_DO_MOTOR, STATUS_TURNO, STATUS_SESSAO, ROLES_MENSAGEM]) assert.ok(Object.isFrozen(lista));
 });

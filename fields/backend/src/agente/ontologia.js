@@ -487,7 +487,10 @@ const CONTEXTO_DO_MOTOR =
   "canal=…/> — é dali que vêm a data e a hora de agora — e, quando houver, <memoria> e " +
   "<resumo_conversa_anterior>. Esses blocos são do sistema, não pedidos dele; não os comente.";
 const CONTEXTO_NO_CANAL = {
-  web: CONTEXTO_DO_MOTOR,
+  // A tela manda junto a tarefa que está aberta nela (POST /api/agente/chat, contexto.tarefa_id): é o
+  // que resolve "esta tarefa" e "adia isso" sem uma busca às cegas — e sem o modelo perguntar o id.
+  web: CONTEXTO_DO_MOTOR + " Quando o Carlos está com uma tarefa aberta na tela, o bloco traz " +
+    "tarefa_aberta=<tarefa_id>: é a ela que \"esta tarefa\" e \"isso\" se referem (leia com ConsultarTarefa).",
   whatsapp: CONTEXTO_DO_MOTOR,
   mcp: "CONTEXTO: neste canal não há bloco de contexto na mensagem do Carlos. A data de hoje " +
     "(fuso America/Sao_Paulo) é o campo `data` de ResumoDoDia (o mesmo do recurso " +
@@ -643,11 +646,14 @@ function escaparXml(texto) {
  * Aqui e não no system: o system é congelado (ver systemPrompt), e o turno do usuário é o lugar
  * natural do que muda a cada mensagem.
  */
-export function contextoDoTurno({ agora = new Date(), canal, memorias = [], recap = null } = {}) {
+export function contextoDoTurno({ agora = new Date(), canal, memorias = [], recap = null, tarefaAberta = null } = {}) {
   if (!CANAIS.includes(canal)) throw new TypeError(`contextoDoTurno: canal fora de CANAIS (${String(canal)})`);
   const { data, hora } = agoraLocal(agora);
+  // A tarefa aberta na tela (A2b): só um id, que vem do cliente — escapado também nas aspas, porque
+  // vai dentro de um atributo.
+  const aberta = tarefaAberta ? ` tarefa_aberta="${escaparXml(tarefaAberta).replaceAll('"', "&quot;")}"` : "";
   const partes = [
-    `<contexto agora="${DIA_DA_SEMANA.format(agora)}, ${dataBr(data)} ${hora}" fuso="${FUSO}" canal="${canal}"/>`,
+    `<contexto agora="${DIA_DA_SEMANA.format(agora)}, ${dataBr(data)} ${hora}" fuso="${FUSO}" canal="${canal}"${aberta}/>`,
   ];
   const memoria = _blocoDeMemoria(memorias);
   if (memoria) partes.push(`<memoria>\n${memoria}\n</memoria>`);

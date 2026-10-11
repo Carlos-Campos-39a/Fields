@@ -77,3 +77,28 @@ export const [MEMORIA_ATIVA, MEMORIA_ARQUIVADA] = STATUS_MEMORIA;
  * caminho do desfazer; as ferramentas são as mesmas nos três.
  */
 export const CANAIS = Object.freeze(["web", "whatsapp", "mcp"]);
+
+// ─── A2b · motor do agente ───
+
+/**
+ * Os canais em que o MOTOR conversa (sessão, histórico, turno com modelo). O MCP fica de fora: lá
+ * quem conversa é o Desktop/Cowork, e o turno é uma escrita só (rotas/ops.js).
+ */
+export const CANAIS_DO_MOTOR = Object.freeze(["web", "whatsapp"]);
+
+/**
+ * agente_turnos.status. EM_ANDAMENTO é o turno aberto pelo motor (concluido_em nulo); os quatro
+ * finais dizem COMO ele acabou: CONCLUIDO (o modelo respondeu), ESGOTADO (prazo ou limite de
+ * chamadas — resposta parcial honesta), FALHOU (erro ou corte) e RECUSADO (o modelo recusou).
+ * Sem CHECK no banco: a coluna nasceu na A2 sem ele, e acrescentar um a tabela existente exige
+ * migração própria — a lista vale no código, e o teste do motor a cobra.
+ */
+export const STATUS_TURNO = Object.freeze(["EM_ANDAMENTO", "CONCLUIDO", "ESGOTADO", "FALHOU", "RECUSADO"]);
+export const [TURNO_EM_ANDAMENTO, TURNO_CONCLUIDO, TURNO_ESGOTADO, TURNO_FALHOU, TURNO_RECUSADO] = STATUS_TURNO;
+
+/** agente_sessoes.status — uma ATIVA por canal (índice único parcial). */
+export const STATUS_SESSAO = Object.freeze(["ATIVA", "ENCERRADA"]);
+export const [SESSAO_ATIVA, SESSAO_ENCERRADA] = STATUS_SESSAO;
+
+/** agente_mensagens.role — o que a Messages API aceita no histórico. */
+export const ROLES_MENSAGEM = Object.freeze(["user", "assistant"]);
