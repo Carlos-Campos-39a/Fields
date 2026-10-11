@@ -1,4 +1,4 @@
-/* Folha global do Fields': tokens (claro/escuro + nomes legados do App.jsx) e base. Estilo de
-   componente mora em src/ui/*.module.css. */
+/* Folha global do Fields': tokens (claro e escuro) e base. Estilo de componente mora no
+   .module.css de cada um (src/ui/ e as pastas das telas). */
 @import "./theme/tokens.css";
 @import "./theme/base.css";

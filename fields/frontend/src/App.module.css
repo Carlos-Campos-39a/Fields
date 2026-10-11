@@ -1,0 +1,36 @@
+/*
+ * A casca (App.jsx): só a grade — barra lateral, painel e a MobileNav. Tokens desde já: o fundo
+ * da página é o do tema, não o #f5f3f0 fixo do monólito (que deixava a tela meio clara, meio
+ * escura). As telas dentro do painel trazem o próprio fundo enquanto ainda têm estilo legado.
+ */
+
+.casca {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.area {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.painel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.conteudo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}

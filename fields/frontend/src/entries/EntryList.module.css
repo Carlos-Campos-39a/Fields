@@ -1,0 +1,150 @@
+/*
+ * A lista de entradas da barra lateral (entries/EntryList.jsx). Só tokens: herda o tema de quem
+ * a monta, claro ou escuro, sem fundo próprio — o fundo é o da barra lateral.
+ *
+ * Contraste: a 2ª linha é --text-3 (5,1:1 sobre --bg), mas sobre o --accent-soft da linha ativa
+ * cairia para ~4,4:1 no claro; ali ela sobe para --text-2. O ícone da ativa e o pino são
+ * --accent-ink (o --accent puro dá 2,96:1 no claro).
+ */
+
+.lista {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-2) var(--sp-2) var(--sp-4);
+  font-family: var(--font-ui);
+}
+
+.itens {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+
+.link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px; /* alvo de toque: no celular a lista É a tela de #/notas */
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) ease;
+}
+
+/* Dentro de um contêiner que rola, o anel de fora seria cortado nas bordas: vai para dentro. */
+.link:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .link:hover {
+    background: var(--surface-2);
+  }
+}
+
+.ativa,
+.ativa:hover {
+  background: var(--accent-soft);
+}
+
+/* O marcador da ativa: preenchimento, não texto — o laranja puro é permitido. A cor nunca é o
+   único sinal: a ativa também tem o título em 500 e aria-current="page". */
+.ativa::before {
+  content: "";
+  position: absolute;
+  top: var(--sp-2);
+  bottom: var(--sp-2);
+  left: 0;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  font-size: var(--fs-xs); /* a bandeira (emoji) dos tipos de língua */
+  line-height: 1;
+  color: var(--text-3);
+}
+
+.ativa .icone {
+  color: var(--accent-ink);
+}
+
+.titulo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-base);
+}
+
+.ativa .titulo {
+  font-weight: var(--fw-medium);
+}
+
+.semTitulo {
+  font-style: italic;
+  color: var(--text-3);
+}
+
+.pino {
+  color: var(--accent-ink);
+}
+
+.detalhe {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding-left: calc(14px + var(--sp-2)); /* alinha com o título, depois do ícone */
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+  color: var(--text-3);
+}
+
+.ativa .detalhe {
+  color: var(--text-2);
+}
+
+.previa {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.estado {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-6) var(--sp-4);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  text-align: center;
+  color: var(--text-3);
+}

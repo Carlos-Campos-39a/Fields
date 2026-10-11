@@ -1,8 +1,11 @@
-/* Região fixa no rodapé, centralizada. Fica montada sempre: é a live region que anuncia. */
+/* Região fixa no rodapé, centralizada. Fica montada sempre: é a live region que anuncia.
+   --altura-barra-inferior é publicada pela MobileNav (layout/) enquanto ela está montada: no
+   celular o toast sobe acima da barra em vez de cobrir as vistas e o "Desfazer" ficar por baixo
+   dela. Fora do celular a variável não existe e o fallback 0px mantém o rodapé de sempre. */
 .regiao {
   position: fixed;
   left: 50%;
-  bottom: var(--sp-5);
+  bottom: calc(var(--sp-5) + var(--altura-barra-inferior, 0px));
   z-index: var(--z-toast);
   transform: translateX(-50%);
   display: flex;
@@ -85,7 +88,7 @@
 
 @media (max-width: 480px) {
   .regiao {
-    bottom: var(--sp-4);
+    bottom: calc(var(--sp-4) + var(--altura-barra-inferior, 0px));
     width: calc(100vw - 2 * var(--sp-4));
   }
   .toast {

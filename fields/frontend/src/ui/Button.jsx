@@ -10,6 +10,7 @@ export const BUTTON_SIZES = ["sm", "md"];
  * Botão de texto. `variant`: primary (tinta invertida) | secondary | ghost | danger.
  * `size`: sm (28px) | md (36px). `icon`/`iconRight` são nós (ex.: <Icon name="plus" />).
  * `loading` troca o ícone por um Spinner, desabilita e marca aria-busy.
+ * Alternância: passe `aria-pressed`; o estado ligado é do CSS (ghost e secondary).
  */
 export const Button = forwardRef(function Button(
   {

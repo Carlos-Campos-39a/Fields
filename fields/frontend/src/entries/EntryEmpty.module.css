@@ -1,0 +1,69 @@
+/* O painel vazio de #/notas (entries/EntryEmpty.jsx). Só tokens. */
+
+.vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  min-height: 100%;
+  padding: var(--sp-7) var(--sp-5);
+  text-align: center;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+/* O monograma é ícone: o laranja puro é permitido (não é texto). */
+.logo {
+  margin-bottom: var(--sp-2);
+  color: var(--accent);
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+}
+
+.descricao {
+  max-width: 360px;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+.dicas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  list-style: none;
+}
+
+.dica {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--fs-xs);
+  line-height: 1;
+}
+
+.prefixo {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+/* O chevron separa o que se digita do tipo que sai; é decorativo (o leitor lê "evento … Evento"). */
+.tipo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-3);
+}

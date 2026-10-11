@@ -1,0 +1,185 @@
+/*
+ * Uma entrada aberta (entries/EntryView.jsx). Só tokens, nos dois temas.
+ * Lora no título e no corpo (leitura); Poppins no resto. 720px de coluna: ~70 caracteres por linha
+ * no corpo de 16px.
+ */
+
+.pagina {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--sp-5) var(--sp-7);
+  font-family: var(--font-ui);
+  color: var(--text);
+  animation: entrar var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+
+.tipo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/* Ícone de estado: --accent-ink passa 3:1 nos dois temas (o --accent puro dá 2,96:1 no claro). */
+.pino {
+  color: var(--accent-ink);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+
+/* Fixar é alternância (aria-pressed): o fundo de "ativo" é o do próprio Button ghost ligado; aqui
+   só o pino vai para a tinta. O .acoes na frente vence as regras do Button sem depender da ordem
+   do CSS. */
+.acoes .fixar[aria-pressed="true"] svg {
+  color: var(--accent-ink);
+}
+
+/* Excluir é ghost (a exclusão tem Desfazer, não pede confirmação); o vermelho vem no hover. */
+@media (hover: hover) {
+  .acoes .excluir:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.semTitulo {
+  font-style: italic;
+  color: var(--text-3);
+}
+
+.meta {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.corpo {
+  margin-top: var(--sp-5);
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  line-height: var(--lh-reading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+  list-style: none;
+}
+
+.relacionadas {
+  margin-top: var(--sp-6);
+}
+
+.listaRelacionadas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  list-style: none;
+}
+
+.relacionada {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+@media (hover: hover) {
+  .relacionada:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+  }
+}
+
+.relacionadaIcone {
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: var(--fs-xs); /* a bandeira (emoji) dos tipos de língua */
+  line-height: 1;
+  color: var(--text-3);
+}
+
+.relacionadaTitulo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+
+.relacionadaData {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.anotacoes {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 767.98px) {
+  .pagina {
+    padding: var(--sp-5) var(--sp-4) var(--sp-6);
+  }
+
+  .cabecalho {
+    margin-bottom: var(--sp-4);
+  }
+}

@@ -1,0 +1,22 @@
+/* Espera do Gate (auth/Gate.jsx) enquanto GET /api/auth/me não volta. Só tokens. */
+
+.espera {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text-3);
+  /* Invisível nos primeiros 400 ms: a resposta rápida não pisca um spinner na tela. */
+  animation: aparecer 1ms 400ms both;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

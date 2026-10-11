@@ -52,7 +52,6 @@ const GRUPOS_DE_COR = [
   },
   { titulo: "Primário e preenchimento", tokens: ["--primary-bg", "--primary-fg", "--primary-bg-hover", "--on-fill"] },
   { titulo: "Sobreposição e rolagem", tokens: ["--overlay", "--scrollbar-thumb", "--scrollbar-thumb-hover"] },
-  { titulo: "Legado do App.jsx", tokens: ["--text-main", "--gray-200"] },
 ];
 
 // [primeiro plano, fundo, mínimo]. 4,5 para texto; 3 para componente não textual (anel de foco).
@@ -269,9 +268,9 @@ function Escalas({ valores }) {
             </code>
             <div style={{ fontSize: `var(${nome})` }}>
               <div>
-                <span style={{ fontWeight: 400 }}>Reunião às 14h </span>
-                <span style={{ fontWeight: 500 }}>com a equipe </span>
-                <span style={{ fontWeight: 600 }}>de produto</span>
+                <span className={g.peso400}>Reunião às 14h </span>
+                <span className={g.peso500}>com a equipe </span>
+                <span className={g.peso600}>de produto</span>
               </div>
               <div className={g.serif}>
                 Bom dia, Carlos. <em>Três tarefas vencem hoje.</em>
@@ -544,9 +543,9 @@ function DemoPopover() {
             Abrir perto da borda
           </Button>
           <Popover id={bordaId} open={bordaAberta} onClose={() => setBordaAberta(false)} anchorRef={bordaRef} label="Exemplo de posição" width={260}>
-            <div style={{ padding: "var(--sp-2)", display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+            <div className={g.popoverExemplo}>
               <SectionLabel as="p">Prazo</SectionLabel>
-              <p style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)" }}>
+              <p className={g.popoverTexto}>
                 Conteúdo livre: o popover mede a si mesmo e escolhe o lado.
               </p>
               <Button size="sm" variant="primary" onClick={() => setBordaAberta(false)}>
@@ -621,7 +620,7 @@ function Diversos() {
           <Spinner size={12} />
           <Spinner />
           <Spinner size={24} label="Carregando tarefas" />
-          <span style={{ color: "var(--accent)" }}>
+          <span className={g.acento}>
             <Spinner size={20} />
           </span>
         </div>
@@ -630,7 +629,7 @@ function Diversos() {
           {[16, 24, 32, 48].map((tamanho) => (
             <Logo key={tamanho} size={tamanho} />
           ))}
-          <span style={{ color: "var(--accent)" }}>
+          <span className={g.acento}>
             <Logo size={32} title="Fields'" />
           </span>
           <span className={g.ladrilho}>

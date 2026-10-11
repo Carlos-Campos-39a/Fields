@@ -1,11 +1,12 @@
 /*
  * Base do Fields' (R1): reset, corpo, foco, movimento reduzido e rolagem.
  *
- * Compatibilidade com o App.jsx (monólito, até a R2):
- *  - o reset zera margin/padding de tudo, como o index.css antigo — o App.jsx depende disso;
- *  - o corpo NÃO fixa font-size nem line-height: trechos do App.jsx sem tamanho explícito herdam
- *    os 16px do navegador. Os primitivos de src/ui/ declaram o próprio tamanho;
- *  - @keyframes fadeUp continua global: o App.jsx a usa em style inline.
+ * Herdado do monólito (quebrado na R2), e de que as telas ainda dependem:
+ *  - o reset zera margin/padding de tudo, como o index.css antigo — os módulos das telas contam
+ *    com <h*>, <p> e <ul> sem margem;
+ *  - o corpo NÃO fixa font-size nem line-height: cada componente declara o próprio tamanho, e o
+ *    que não declara herda os 16px do navegador.
+ * O @keyframes fadeUp global saiu com o App.jsx antigo, o único que o usava (em style inline).
  */
 
 *,
@@ -93,20 +94,8 @@ select {
   }
 }
 
-/* ── Animação usada pelo App.jsx (style inline) ───────────────────────────────────────── */
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ── Movimento reduzido ───────────────────────────────────────────────────────────────── */
-/* O !important vence o style inline do App.jsx. O Spinner reabre a própria exceção. */
+/* O !important vence qualquer animação de módulo ou inline. O Spinner reabre a própria exceção. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

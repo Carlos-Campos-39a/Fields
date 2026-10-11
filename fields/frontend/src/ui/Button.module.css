@@ -80,6 +80,26 @@
   background: var(--danger-hover);
 }
 
+/* ── Alternância ligada (aria-pressed="true") ───────────────────────────── */
+/* ghost ganha o fundo de "ativo"; secondary, o tom de marca com anel. A cor nunca é o único sinal:
+   quem usa põe aria-pressed (o leitor de tela diz "pressionado") e, de preferência, um ícone.
+   O :where() deixa o seletor com o peso de UMA classe: uma tela que queira outro "ligado" (o
+   filtro da barra lateral é tinta invertida) vence com duas classes, sem depender da ordem em que
+   o CSS das telas é importado. O :hover repetido (0,3,0, depois do hover da variante) impede o
+   hover de apagar o estado. */
+.ghost:where([aria-pressed="true"]),
+.ghost:where([aria-pressed="true"]):hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.secondary:where([aria-pressed="true"]),
+.secondary:where([aria-pressed="true"]):hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .rotulo {
   overflow: hidden;
   text-overflow: ellipsis;

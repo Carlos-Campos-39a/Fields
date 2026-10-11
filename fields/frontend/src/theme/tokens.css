@@ -21,8 +21,8 @@
  * Estrutura:
  *  1. claro (padrão) em :root e em qualquer [data-theme="light"];
  *  2. escuro em [data-theme="dark"], e pelo sistema quando o <html> não pediu claro;
- *  3. derivados e nomes legados em ":root, [data-theme]", para que um subárvore com data-theme
- *     próprio (a galeria compara os dois lados) recalcule os aliases com os valores dele.
+ *  3. derivados em ":root, [data-theme]", para que um subárvore com data-theme próprio (a galeria
+ *     compara os dois lados) recalcule os derivados com os valores dele.
  */
 
 /* ── 1. Claro (padrão) + escalas que não mudam com o tema ───────────────────────────────── */
@@ -47,6 +47,9 @@
   --accent: #d97757; /* preenchimento, ícone, foco */
   --accent-ink: #b5532f; /* texto e link "Desfazer" — 4,7:1 */
   --accent-soft: rgba(217, 119, 87, 0.14);
+  /* O F' claro sobre o ladrilho laranja (public/favicon.svg). É marca, não tema: o escuro não o
+     redefine, e ele nunca é texto de interface. */
+  --logo-tinta: #faf9f5;
 
   /* Estados: a cor de preenchimento e a "tinta" (versão que passa como texto) */
   --on-fill: #141413;
@@ -113,7 +116,8 @@
   --dur-base: 180ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* Camadas (o App.jsx usa até 9999 inline) */
+  /* Camadas. Os números altos vêm do monólito, que chegava a 9999 inline; hoje as telas usam no
+     máximo 1 (cabeçalho fixo), e estes dois ficam por cima de tudo. */
   --z-popover: 10000;
   --z-toast: 10010;
 }
@@ -204,17 +208,12 @@
   }
 }
 
-/* ── 3. Derivados e legado ──────────────────────────────────────────────────────────────── */
+/* ── 3. Derivados ───────────────────────────────────────────────────────────────────────── */
+/* Os aliases legados do App.jsx (--text-main, --gray-200, --r-md, --r-lg, --r-full) saíram na R2,
+   quando o monólito foi quebrado e nada mais os lia. */
 :root,
 [data-theme] {
   --primary-bg: var(--text);
   --primary-fg: var(--bg);
   --focus-ring: var(--accent-ink);
-
-  /* Legado do App.jsx — somem quando a R2 quebrar o monólito. Não use em código novo. */
-  --text-main: var(--text);
-  --gray-200: var(--border);
-  --r-md: var(--radius-sm);
-  --r-lg: var(--radius-lg);
-  --r-full: var(--radius-pill);
 }

@@ -1,0 +1,147 @@
+/*
+ * #/cards (entries/CardsView.jsx). Só tokens. Cartão = --surface com borda de 1px; sombra fica
+ * para sobreposição (popover, toast, diálogo), como manda a R1.
+ */
+
+.pagina {
+  min-height: 100%;
+  padding: var(--sp-6) var(--sp-5) var(--sp-7);
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.carregando {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-7) 0;
+  color: var(--text-3);
+}
+
+.cabecalho {
+  margin-bottom: var(--sp-4);
+}
+
+/* Grade em ordem de leitura. min(100%, 260px): no celular estreito a coluna nunca passa da tela. */
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--sp-3);
+  list-style: none;
+}
+
+.cartao {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  transition: border-color var(--dur-fast) ease;
+}
+
+@media (hover: hover) {
+  .cartao:hover {
+    border-color: var(--border-strong);
+  }
+
+  .cartao:hover .titulo {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/* Ícone de estado: --accent-ink, que passa 3:1 nos dois temas (o --accent puro dá 2,96:1). */
+.pino {
+  margin-left: auto;
+  color: var(--accent-ink);
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+}
+
+.link {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* O link estica sobre o cartão inteiro; o anel de foco vai para o cartão, não para o título. */
+.link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+}
+
+.link:focus-visible {
+  outline: none;
+}
+
+.link:focus-visible::after {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Corpo de nota é Lora (R1), também na prévia. Quatro linhas e reticências. */
+.previa {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  list-style: none;
+}
+
+/* margin-top: auto empurra o rodapé para a base: cartões da mesma linha alinham o rodapé. */
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.anotacoes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+
+@media (max-width: 767.98px) {
+  .pagina {
+    padding: var(--sp-4) var(--sp-4) var(--sp-6);
+  }
+}

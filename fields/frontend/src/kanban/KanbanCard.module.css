@@ -1,0 +1,196 @@
+/*
+ * Cartão de tarefa do kanban (kanban/KanbanCard.jsx). Só tokens: serve nos dois temas.
+ * Cartão = --surface + borda de 1px; sombra só em sobreposição (o menu é um Popover). O hover que o
+ * monólito fazia em JS (uma sombra escura) é a troca de borda abaixo.
+ */
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  transition: border-color var(--dur-fast) ease;
+}
+
+.cartao:hover,
+.cartao:focus-within {
+  border-color: var(--border-strong);
+}
+
+.cartao[draggable="true"] {
+  cursor: grab;
+}
+
+.cartao[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* O cartão que está sendo arrastado fica de pé no lugar de origem, esmaecido. */
+.arrastando {
+  opacity: 0.5;
+}
+
+.titulo {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-base);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Feita: riscada em --text-3 (5,1:1) — e não opacity, que derrubava o contraste do texto todo. */
+.feito .titulo {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.chip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.chipTexto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 28px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  min-width: 0;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.prefixo {
+  color: var(--text-3);
+}
+
+.prazo {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* --danger passa como texto nos dois temas (5,2:1 claro, 6,0:1 escuro). O ícone e o texto para
+   leitor de tela dizem o mesmo: a cor nunca é a única portadora do sentido. */
+.vencido {
+  color: var(--danger);
+  font-weight: var(--fw-medium);
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: calc(-1 * var(--sp-1));
+}
+
+/* ── Editor de datas ──────────────────────────────────────────────────────── */
+.editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.rotuloCampo {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* Sem color-scheme aqui: o seletor nativo herda o do tema (tokens.css), claro ou escuro. */
+.data {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.data:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.dica {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+/* ── Menu "Mover para" (dentro do Popover) ───────────────────────────────── */
+.menuTitulo {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+}
+
+/* Dois níveis de classe: vence o .item do Popover qualquer que seja a ordem das folhas no bundle. */
+.menu .menuItem {
+  min-height: 36px;
+}
+
+/* Toque: alvo de 44px (o dedo não acerta 32px numa lista de quatro). */
+@media (pointer: coarse) {
+  .menu .menuItem {
+    min-height: 44px;
+  }
+}
+
+/* ── Celular ──────────────────────────────────────────────────────────────── */
+/* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar a data, e a casca (100dvh,
+   overflow hidden) não volta sozinha. */
+@media (max-width: 767.98px) {
+  .data {
+    font-size: var(--fs-md);
+  }
+}

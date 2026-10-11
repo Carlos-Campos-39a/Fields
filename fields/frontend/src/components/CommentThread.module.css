@@ -1,0 +1,185 @@
+/* Fio de comentários (components/CommentThread.jsx). Só tokens: serve nos dois temas. */
+
+.fio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.carregando {
+  color: var(--text-3);
+}
+
+.alerta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.vazio {
+  font-size: var(--fs-sm);
+  font-style: italic;
+  color: var(--text-3);
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  list-style: none;
+}
+
+.item {
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.pendente {
+  opacity: 0.6;
+}
+
+.texto {
+  font-family: var(--font-serif);
+  font-size: var(--fs-base);
+  line-height: var(--lh-reading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.data {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* Excluir e desvincular são IconButton sm (28px) — bom para o mouse, pequeno para o dedo. Em tela
+   de toque sobem para 36px, a mesma altura do Button md das ações da entrada no celular. Duas
+   classes: vence o .sm do primitivo sem depender da ordem do CSS. */
+@media (pointer: coarse) {
+  .fio .alvoDeToque {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+.vinculo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 2px 2px 2px var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.caminho {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caminho strong {
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.campo {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  resize: vertical;
+}
+
+.campo::placeholder {
+  color: var(--text-3);
+}
+
+.campo:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.acoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+/* ── Compacto: dentro de um Popover (tarefa) ou do cartão de reunião ───────────────── */
+.compacto {
+  gap: var(--sp-2);
+}
+
+.compacto .lista {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.compacto .item {
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
+  border-radius: var(--radius-sm);
+}
+
+.compacto .texto {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+
+.compacto .acoes {
+  flex-direction: row;
+}
+
+/* ── Celular ──────────────────────────────────────────────────────────────── */
+/* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo, e a casca (100dvh,
+   overflow hidden) não volta sozinha. Vale para as três casas do fio: Anotações, reunião, tarefa. */
+@media (max-width: 767.98px) {
+  .campo {
+    font-size: var(--fs-md);
+  }
+}

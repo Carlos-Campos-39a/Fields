@@ -1,0 +1,408 @@
+/*
+ * Acompanhamento de projetos (projects/ProjectsView.jsx). Só tokens: claro e escuro saem do mesmo
+ * CSS, sem tema escuro forçado na raiz — era o que deixava esta tela escura dentro da casca clara.
+ *
+ * Desktop: uma tabela, um <tbody> por projeto. Abaixo de 768px (o mesmo corte de
+ * lib/useEhMobile.js) a MESMA marcação vira cartões: cada <tbody> é um cartão e cada tarefa um
+ * bloco com o rótulo de cada campo (data-rotulo). Uma marcação só, para as duas vistas nunca
+ * divergirem em comportamento — só em arranjo.
+ */
+
+.pagina {
+  /* Frente e tarefa alinham com o NOME do projeto, que vem depois do chevron: 12 + 28 + 4. */
+  --recuo-frente: calc(var(--sp-3) + 28px + var(--sp-1));
+  /* A tarefa ainda tem a marca (14px) e o vão antes do nome. */
+  --recuo-tarefa: calc(var(--recuo-frente) + 14px + var(--sp-1));
+
+  min-height: 100%;
+  padding: var(--sp-6) var(--sp-6) var(--sp-7);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+/* ── Cabeçalho ─────────────────────────────────────────────────────────── */
+.cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.titulo {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+
+.subtitulo {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+.acoesTopo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ── Carregando e vazio ────────────────────────────────────────────────── */
+.carregando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-7) var(--sp-5);
+  font-size: var(--fs-base);
+  color: var(--text-2);
+}
+
+.caixaVazia {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+/* ── Tabela ────────────────────────────────────────────────────────────── */
+.moldura {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.tabela {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--text);
+}
+
+/* Larguras medidas para ~920px (a 1280 com a barra lateral): o status mais largo ("Em definição"
+   com o ponto) cabe em 16%, e "10/10/2027" em 11%. */
+.colNome {
+  width: 26%;
+}
+.colAcao {
+  width: 17%;
+}
+.colStatus {
+  width: 16%;
+}
+.colStake {
+  width: 12%;
+}
+.colPrazo {
+  width: 11%;
+}
+.colHolder {
+  width: 14%;
+}
+.colAcoes {
+  width: 4%;
+}
+
+.tabela th {
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-label);
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-2);
+  user-select: none;
+}
+
+.tabela th:first-child {
+  padding-left: var(--sp-3);
+}
+
+.celula {
+  padding: var(--sp-2);
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+  min-width: 0;
+}
+
+.cNome {
+  padding-left: var(--sp-3);
+}
+
+.cAcoes {
+  padding-inline: var(--sp-1);
+  text-align: center;
+}
+
+/* Projeto: a linha mais alta; o peso do nome vem da célula (EditableCell variante "projeto"). */
+.linhaProjeto > .celula {
+  padding-block: var(--sp-3);
+}
+
+/* Entre um projeto e o seguinte, a linha mais forte da tabela. */
+.grupo + .grupo .linhaProjeto > .celula {
+  border-top-color: var(--border-strong);
+}
+
+/* Frente: uma faixa em --bg, que é um passo abaixo de --surface nos dois temas. */
+.linhaFrente > .celula {
+  background: var(--bg);
+}
+
+.cFrente {
+  padding-left: var(--recuo-frente);
+}
+
+.linhaTarefa > .cNome {
+  padding-left: var(--recuo-frente);
+}
+
+.linhaAdicionar > .celula {
+  border-top: 0;
+  padding-block: var(--sp-1) var(--sp-2);
+}
+
+.adicionarProjeto {
+  padding-left: var(--sp-3);
+}
+
+.adicionarFrente {
+  padding-left: var(--recuo-frente);
+}
+
+.adicionarTarefa {
+  padding-left: var(--recuo-tarefa);
+}
+
+.nomeLinha {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.nome {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Marca da tarefa: um anel pendente, um check concluída. Decorativa — o status diz o mesmo. */
+.marca {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.marcaPendente {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--decorative);
+}
+
+.marcaFeita {
+  color: var(--success);
+}
+
+.ocultas {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* O "+ Frente" alinha o ícone com o nome das frentes, e não a borda do botão. */
+.botaoRecuado {
+  margin-left: calc(var(--sp-2) * -1);
+}
+
+/* Excluir: o vermelho do hover é do IconButton tone="danger". Aqui só o repouso fica mais discreto
+   que o --text-2 do primitivo; o "button" no seletor vence o .botao, que tem o mesmo peso de
+   classe e dependeria da ordem do CSS. */
+button.excluir {
+  color: var(--text-3);
+}
+
+/* ── Campo de criação (projeto, frente, tarefa) ────────────────────────── */
+.campoNovo {
+  display: block;
+  width: min(100%, 420px);
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+}
+
+.campoNovo::placeholder {
+  color: var(--text-3);
+  opacity: 1;
+}
+
+/* Anel por cima da borda: a célula é estreita, e o recuo padrão (2px) invadiria a vizinha. */
+.campoNovo:focus-visible {
+  outline-offset: -1px;
+}
+
+/* ── Celular: cartões ──────────────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+  .pagina {
+    --recuo-frente: var(--sp-3);
+    --recuo-tarefa: var(--sp-3);
+    padding: var(--sp-4) var(--sp-4) var(--sp-6);
+  }
+
+  .cabecalho {
+    align-items: flex-start;
+    margin-bottom: var(--sp-4);
+  }
+
+  .moldura {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .tabela {
+    min-width: 0;
+  }
+
+  .tabela,
+  .tabela tbody,
+  .tabela tr,
+  .tabela td {
+    display: block;
+  }
+
+  /* O cabeçalho some; cada célula diz o próprio rótulo (data-rotulo, abaixo). */
+  .tabela thead,
+  .tabela colgroup {
+    display: none;
+  }
+
+  .tabela .grupo {
+    margin-bottom: var(--sp-3);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .tabela .celula {
+    border-top: 0;
+  }
+
+  /* As colunas que o projeto não usa (ação, stakeholder, deadline). */
+  .tabela .vazia {
+    display: none;
+  }
+
+  .tabela .linhaProjeto,
+  .tabela .linhaTarefa {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    column-gap: var(--sp-2);
+    align-items: start;
+  }
+
+  .tabela .linhaProjeto {
+    grid-template-areas:
+      "nome   nome   acoes"
+      "status holder holder";
+  }
+
+  .tabela .linhaTarefa {
+    grid-template-areas:
+      "nome   nome   acoes"
+      "acao   acao   acao"
+      "status holder holder"
+      "stake  prazo  prazo";
+    border-top: 1px solid var(--border);
+  }
+
+  .tabela .linhaFrente {
+    display: flex;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .tabela .cFrente {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tabela .linhaAdicionar {
+    border-top: 1px solid var(--border);
+  }
+
+  .tabela .linhaProjeto > .celula {
+    padding-block: var(--sp-2);
+  }
+
+  .tabela .linhaProjeto > .cNome,
+  .tabela .linhaProjeto > .cAcoes {
+    padding-top: var(--sp-3);
+  }
+
+  .tabela .cNome {
+    grid-area: nome;
+  }
+  .tabela .cAcao {
+    grid-area: acao;
+  }
+  .tabela .cStatus {
+    grid-area: status;
+  }
+  .tabela .cStake {
+    grid-area: stake;
+  }
+  .tabela .cPrazo {
+    grid-area: prazo;
+  }
+  .tabela .cHolder {
+    grid-area: holder;
+  }
+  .tabela .cAcoes {
+    grid-area: acoes;
+  }
+
+  .tabela .celula[data-rotulo]::before {
+    content: attr(data-rotulo);
+    display: block;
+    margin-bottom: 2px;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  /* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo, e a casca (100dvh,
+     overflow hidden) não volta sozinha. */
+  .campoNovo {
+    width: 100%;
+    font-size: var(--fs-md);
+  }
+}

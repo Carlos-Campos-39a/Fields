@@ -1,0 +1,14 @@
+/* A página de uma entrada (entries/EntryPage.jsx): o fundo é o do painel (tokens), sem tema próprio. */
+
+.pagina {
+  min-height: 100%;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.carregando {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-7) var(--sp-5);
+  color: var(--text-3);
+}

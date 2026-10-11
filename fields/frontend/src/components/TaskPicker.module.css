@@ -1,0 +1,43 @@
+/* Seletor de tarefa (components/TaskPicker.jsx). Só tokens; a caixa, a sombra e o foco são do Popover. */
+
+.cabecalho {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.lista {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.projeto {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+
+.frente {
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-4);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* Dois níveis de classe: vence o .item do Popover qualquer que seja a ordem das folhas no bundle. */
+.lista .tarefa {
+  padding-left: var(--sp-5);
+}

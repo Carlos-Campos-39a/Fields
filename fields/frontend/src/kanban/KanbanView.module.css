@@ -1,0 +1,252 @@
+/*
+ * Kanban (kanban/KanbanView.jsx). Só tokens: serve nos dois temas — no monólito eram cinzas e
+ * brancos translúcidos fixos dentro de um tema escuro forçado, e a tela clara ficava meio escura.
+ *
+ * Desktop: as colunas lado a lado numa grade; rola na horizontal só se não couberem.
+ * Celular (< 768px): uma coluna por vez, com rolagem horizontal que encaixa (scroll-snap) e a
+ * próxima coluna aparecendo na borda — é o que diz "tem mais para o lado" sem texto.
+ */
+
+.tela {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-height: 100%;
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.carregando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 240px;
+  padding: var(--sp-7) var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+/* ── Cabeçalho ────────────────────────────────────────────────────────────── */
+.cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-4);
+}
+
+.titulos {
+  min-width: 0;
+}
+
+.tituloTela {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+
+.subtitulo {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/* <select> nativo: a lista que abre segue o color-scheme do tema (tokens.css). */
+.seletor {
+  max-width: 100%;
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.seletor:hover {
+  background: var(--surface-2);
+}
+
+.seletor:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* ── Quadro ───────────────────────────────────────────────────────────────── */
+.quadro {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(208px, 1fr);
+  gap: var(--sp-3);
+  overflow-x: auto;
+  padding-bottom: var(--sp-2);
+}
+
+/* A cor do tom da coluna (o mesmo do StatusBadge do cabeçalho), para o realce de "solte aqui". */
+.coluna[data-tom="neutral"] {
+  --cor-coluna: var(--text-3);
+}
+.coluna[data-tom="accent"] {
+  --cor-coluna: var(--accent);
+}
+.coluna[data-tom="info"] {
+  --cor-coluna: var(--info);
+}
+.coluna[data-tom="success"] {
+  --cor-coluna: var(--success);
+}
+.coluna[data-tom="warning"] {
+  --cor-coluna: var(--warning);
+}
+.coluna[data-tom="danger"] {
+  --cor-coluna: var(--danger);
+}
+
+.coluna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: 240px;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+/* Cartão arrastado por cima: a coluna se tinge do próprio tom. */
+.alvo {
+  border-color: var(--cor-coluna, var(--border-strong));
+  background: var(--surface-2);
+  background: color-mix(in srgb, var(--cor-coluna, var(--text-3)) 8%, transparent);
+}
+
+.cabecalhoColuna {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.contagem {
+  min-width: 20px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-3);
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  list-style: none;
+}
+
+.vazia {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+/* ── Atalhos para as colunas (só celular) ────────────────────────────────── */
+.atalhos {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.atalhos::-webkit-scrollbar {
+  display: none;
+}
+
+.atalho {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.atalho:hover {
+  background: var(--surface-2);
+}
+
+/* ── Celular ──────────────────────────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+  .tela {
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+  }
+
+  .cabecalho,
+  .atalhos {
+    padding-inline: var(--sp-4);
+  }
+
+  .filtros {
+    width: 100%;
+  }
+
+  /* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar o seletor, e a casca (100dvh,
+     overflow hidden) não volta sozinha. */
+  .seletor {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    font-size: var(--fs-md);
+  }
+
+  .quadro {
+    display: flex;
+    gap: var(--sp-3);
+    padding: 0 var(--sp-4) var(--sp-2);
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--sp-4);
+    overscroll-behavior-x: contain;
+  }
+
+  /* A próxima coluna fica com uns 32px à mostra na borda direita. */
+  .coluna {
+    flex: 0 0 calc(100% - var(--sp-6));
+    scroll-snap-align: start;
+    min-height: 50vh;
+  }
+}
