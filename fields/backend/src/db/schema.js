@@ -2,8 +2,8 @@ import { v4 as uuidv4 } from "uuid";
 import { log } from "../lib/log.js";
 import { hojeISO, somarDias } from "../lib/datas.js";
 import {
-  ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, ENTIDADES, MEMORIA_ATIVA, ORIGENS, ROLES_MENSAGEM, SESSAO_ATIVA,
-  STATUS_MEMORIA, STATUS_SESSAO,
+  ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, ENTIDADES, EVENTO_EM_VOO, MEMORIA_ATIVA, ORIGENS, ROLES_MENSAGEM,
+  SESSAO_ATIVA, STATUS_EVENTO, STATUS_MEMORIA, STATUS_SESSAO,
 } from "../dominio/enums.js";
 import { MEMORIA_TEXTO_MAX } from "../dominio/limites.js";
 import { aplicarMigracoes } from "./migracoes.js";
@@ -229,6 +229,38 @@ export const DDL_A2B = `
     CREATE INDEX IF NOT EXISTS agente_turnos_canal_criado_idx ON agente_turnos (canal, criado_em);
 `;
 
+// ─── A3: o webhook do WhatsApp (Les Chats) — aditivo; nada das fases anteriores muda ───
+//
+// eventos_recebidos: a idempotência pelo wamid (o `event_id` do envelope, contrato §6.1). A linha
+// nasce EM_VOO antes do turno e vira CONCLUIDO com a `resposta` — o corpo que foi devolvido, para a
+// retentativa receber o mesmo. Sem ela, a 2ª entrega da Les Chats (o POST dela tem 120 s e retenta
+// uma vez) rodaria o turno de novo: a tarefa criada duas vezes, e duas respostas diferentes para a
+// mesma pergunta. `resposta` é jsonb porque aqui só o significado importa (é o corpo HTTP, não o
+// histórico do modelo, que precisa dos bytes). A limpeza depois de 7 dias é da passada periódica
+// (servicos/whatsapp.js), nunca do boot.
+//
+// canais_whatsapp: com quem se fala e por qual conversa da Les Chats. A Fase 2 (avisos proativos)
+// manda por `conversation_id` — nunca por telefone (contrato §1.b) —, e é daqui que ela o lê.
+export const DDL_A3 = `
+    CREATE TABLE IF NOT EXISTS eventos_recebidos (
+      event_id     TEXT PRIMARY KEY,
+      status       TEXT        NOT NULL DEFAULT '${EVENTO_EM_VOO}' CONSTRAINT eventos_recebidos_status_check CHECK (status IN (${listaSql(STATUS_EVENTO)})),
+      turno_id     TEXT,
+      resposta     JSONB,
+      tentativas   INTEGER     NOT NULL DEFAULT 1,
+      criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      concluido_em TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS eventos_recebidos_criado_idx ON eventos_recebidos (criado_em);
+
+    CREATE TABLE IF NOT EXISTS canais_whatsapp (
+      wa_id           TEXT PRIMARY KEY,
+      conversation_id BIGINT      NOT NULL,
+      bot_id          BIGINT,
+      atualizado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+`;
+
 /**
  * Schema → seed → migrações de dado. Devolve o `estado` que o app precisa saber do banco:
  * {comentariosMigrados} — false quando a migração comentarios_v1 falhou (MIGRACAO_FALHOU no log),
@@ -239,6 +271,7 @@ export async function initDB(db) {
   await db.query(DDL_A1);
   await db.query(DDL_A2);
   await db.query(DDL_A2B);
+  await db.query(DDL_A3);
 
   // Seed if empty (conta também as excluídas: excluir tudo não ressemeia o banco)
   const { rows } = await db.query("SELECT COUNT(*) FROM entries");

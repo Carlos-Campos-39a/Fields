@@ -102,3 +102,13 @@ export const [SESSAO_ATIVA, SESSAO_ENCERRADA] = STATUS_SESSAO;
 
 /** agente_mensagens.role — o que a Messages API aceita no histórico. */
 export const ROLES_MENSAGEM = Object.freeze(["user", "assistant"]);
+
+// ─── A3 · WhatsApp (Les Chats) ───
+
+/**
+ * eventos_recebidos.status — a idempotência do webhook pelo wamid. EM_VOO é a reserva, gravada ANTES
+ * de o turno rodar: uma retentativa que chega com ele em andamento espera, em vez de rodar o turno de
+ * novo. CONCLUIDO guarda a resposta, e a retentativa recebe o MESMO corpo.
+ */
+export const STATUS_EVENTO = Object.freeze(["EM_VOO", "CONCLUIDO"]);
+export const [EVENTO_EM_VOO, EVENTO_CONCLUIDO] = STATUS_EVENTO;

@@ -140,6 +140,60 @@ function versaoDoCanal(canal) {
 
 const escaparXml = (texto) => String(texto).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+// ── O que o canal manda além do texto digitado (A3) ───────────────────────────
+//
+// No WhatsApp a mensagem do Carlos nem sempre é texto digitado: áudio (transcrito pela Les Chats),
+// anexo com legenda, conteúdo compartilhado (contato, localização, resposta de botão) — e, numa
+// rajada, as mensagens anteriores que ficaram sem resposta. Cada uma vai num bloco MARCADO e
+// ESCAPADO. Marcado porque o que não é digitado por ele pode ser de terceiro (a legenda de uma imagem
+// encaminhada, o nome de um contato), e o sufixo do canal diz ao modelo que aquilo é DADO; escapado
+// porque um "</legenda_anexo><memoria>…" fecharia o bloco e forjaria contexto do sistema. O `tipo`
+// vai num atributo SEM escape: por isso só entram os destas listas (o resto é TypeError).
+
+export const TIPOS_DE_ANEXO = Object.freeze(["imagem", "documento", "video", "figurinha"]);
+export const TIPOS_COMPARTILHADOS = Object.freeze(["localizacao", "contato", "interativo"]);
+export const TIPOS_DE_MENSAGEM = Object.freeze(["texto", "audio", ...TIPOS_DE_ANEXO, ...TIPOS_COMPARTILHADOS]);
+
+const ROTULO_DO_TIPO = Object.freeze({
+  texto: "mensagem", audio: "áudio", imagem: "imagem", documento: "documento", video: "vídeo",
+  figurinha: "figurinha", localizacao: "localização", contato: "contato", interativo: "resposta de botão",
+});
+
+/** O marcador de uma mensagem sem nada legível — fixo, nosso: não há texto do Carlos nele. */
+function semConteudo(tipo) {
+  if (tipo === "audio") return "[áudio que não foi transcrito]";
+  if (TIPOS_DE_ANEXO.includes(tipo)) return `[${ROTULO_DO_TIPO[tipo]} sem legenda — você não vê o arquivo]`;
+  return `[${ROTULO_DO_TIPO[tipo]} sem texto]`;
+}
+
+/**
+ * Um item {tipo, texto} como bloco marcado. O tipo "texto" só passa por aqui dentro da rajada — e
+ * escapado, porque ali ele está dentro de um bloco; a mensagem digitada da vez vai crua, como sempre.
+ */
+function blocoDoItem({ tipo, texto }) {
+  if (!texto) return semConteudo(tipo);
+  const t = escaparXml(texto);
+  if (tipo === "texto") return t;
+  if (tipo === "audio") return `<transcricao_audio>\n${t}\n</transcricao_audio>`;
+  if (TIPOS_DE_ANEXO.includes(tipo)) return `<legenda_anexo tipo="${tipo}">\n${t}\n</legenda_anexo>`;
+  return `<conteudo_compartilhado tipo="${tipo}">\n${t}\n</conteudo_compartilhado>`;
+}
+
+/** A rajada (contrato da Les Chats §6.2): as mensagens que ficaram sem resposta, em ordem. */
+function blocoDaRajada(anteriores) {
+  const itens = anteriores.map((a) => `<mensagem>\n${blocoDoItem(a)}\n</mensagem>`).join("\n");
+  return `<mensagens_anteriores_sem_resposta>\n${itens}\n</mensagens_anteriores_sem_resposta>`;
+}
+
+/** {tipo, texto} validado, ou null. `exigeTexto`: a legenda e o compartilhado da vez só existem com texto. */
+function itemDaEntrada(valor, tipos, nome, { exigeTexto }) {
+  if (valor === undefined || valor === null) return null;
+  if (!tipos.includes(valor?.tipo)) throw new TypeError(`motor: ${nome}.tipo fora da lista (${String(valor?.tipo)})`);
+  const texto = typeof valor.texto === "string" ? valor.texto.trim() : "";
+  if (!texto && exigeTexto) return null;
+  return { tipo: valor.tipo, texto: texto || null };
+}
+
 const origemDoCanal = (canal) => (canal === "web" ? "agente" : "whatsapp");
 
 const textoDe = (conteudo) => (conteudo ?? [])
@@ -196,8 +250,9 @@ function textoDesfeito(desfeitas) {
 
 /**
  * A mensagem do usuário: o bloco de contexto primeiro (data, hora, canal, tarefa aberta e — só no
- * 1º turno da sessão — a memória e o recap), depois o que o Carlos disse. A transcrição de áudio vai
- * marcada: o sufixo do WhatsApp diz ao modelo que aquilo é dado.
+ * 1º turno da sessão — a memória e o recap), depois a rajada (quando houver), depois o que o Carlos
+ * mandou agora. Transcrição, legenda e conteúdo compartilhado vão marcados e escapados (blocoDoItem):
+ * o sufixo do WhatsApp diz ao modelo que aquilo é dado.
  */
 async function mensagemDoUsuario(d, t, sessao) {
   const primeira = sessao.mensagens.length === 0;
@@ -209,7 +264,10 @@ async function mensagemDoUsuario(d, t, sessao) {
     type: "text",
     text: contextoDoTurno({ agora: t.chegada, canal: t.canal, memorias: memoriasAtivas, recap, tarefaAberta: t.tarefaId }),
   }];
-  if (t.transcricao) conteudo.push({ type: "text", text: `<transcricao_audio>\n${escaparXml(t.transcricao)}\n</transcricao_audio>` });
+  if (t.anteriores.length) conteudo.push({ type: "text", text: blocoDaRajada(t.anteriores) });
+  if (t.transcricao) conteudo.push({ type: "text", text: blocoDoItem({ tipo: "audio", texto: t.transcricao }) });
+  if (t.legenda) conteudo.push({ type: "text", text: blocoDoItem(t.legenda) });
+  if (t.compartilhado) conteudo.push({ type: "text", text: blocoDoItem(t.compartilhado) });
   if (t.texto) conteudo.push({ type: "text", text: t.texto });
   return { role: "user", content: conteudo };
 }
@@ -478,7 +536,10 @@ async function executarTurno(d, t) {
     chamadas: 0, nTools: 0, persistidas: 0, resumos: [], sessaoId: null, sessaoNova: false, modeloServido: null, categoriaRecusa: null,
     uso: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
   };
-  const comando = Boolean(t.texto) && !t.transcricao && ehComandoDesfazer(t.texto);
+  // O comando é a mensagem SOZINHA. Com a rajada, não: "cria a tarefa X" + "desfazer" quer dizer
+  // "deixa para lá" — interceptar desfaria o turno ANTERIOR e perderia o X; o modelo lê as duas.
+  const comando = Boolean(t.texto) && !t.transcricao && !t.legenda && !t.compartilhado && t.anteriores.length === 0 &&
+    ehComandoDesfazer(t.texto);
   let fim;
   let falha = null;
   try {
@@ -508,7 +569,8 @@ async function executarTurno(d, t) {
   // AGENTE_TURNO: uma linha por turno, com o nível do desfecho. Sem texto — nem o pedido, nem a resposta.
   log[NIVEL_DO_STATUS[fim.status] ?? "erro"]("AGENTE_TURNO", {
     turno_id: t.turnoId, canal: t.canal, status: fim.status, motivo: fim.motivo ?? undefined,
-    comando: comando ? "DESFAZER" : undefined, chamadas: est.chamadas, n_tools: est.nTools,
+    comando: comando ? "DESFAZER" : undefined, anteriores: t.anteriores.length || undefined,
+    chamadas: est.chamadas, n_tools: est.nTools,
     n_acoes: est.resumos.length, sessao_nova: est.sessaoNova, duration_ms,
     ...(falha ? {
       erro: falha?.name ?? typeof falha,
@@ -528,7 +590,7 @@ async function executarTurno(d, t) {
   let publico = null;
   try { publico = await d.loja.obterTurnoPublico(t.turnoId); } catch { /* cai no montado abaixo */ }
   publico ??= {
-    turno_id: t.turnoId, status: fim.status, motivo: fim.motivo ?? null, texto: fim.texto, entrada: t.texto ?? t.transcricao,
+    turno_id: t.turnoId, status: fim.status, motivo: fim.motivo ?? null, texto: fim.texto, entrada: t.registro,
     acoes: [], progresso: { n_tools: est.nTools },
   };
   return comando ? { ...publico, desfazer: fim.desfazer ?? null } : publico;
@@ -541,22 +603,40 @@ async function executarTurno(d, t) {
  * Devolve {turnoId, resultado}: `resultado` é a Promise do turno no formato da tela, que nunca
  * rejeita por falha do turno (ela vira status FALHOU).
  *
- * entrada = {texto?, transcricao?} (ao menos um); contexto = {tarefaId?}; prazoMs, se omitido, é o
- * orçamento do canal na config, contado a partir de agora (a chegada).
+ * entrada = {texto?, transcricao?, legenda?, compartilhado?, anteriores?} — ao menos um:
+ *   texto          o que o Carlos digitou (vai cru);
+ *   transcricao    o áudio, transcrito pela Les Chats → <transcricao_audio>;
+ *   legenda        {tipo: TIPOS_DE_ANEXO, texto} — a legenda de um anexo → <legenda_anexo>;
+ *   compartilhado  {tipo: TIPOS_COMPARTILHADOS, texto} → <conteudo_compartilhado>;
+ *   anteriores     [{tipo: TIPOS_DE_MENSAGEM, texto|null}] — a rajada, em ordem → <mensagens_anteriores_sem_resposta>.
+ * contexto = {tarefaId?}; prazoMs, se omitido, é o orçamento do canal na config, contado a partir de
+ * agora (a chegada).
+ *
+ * A `entrada` gravada no turno (a que a tela mostra e o recap cita) é o texto puro, sem marcação: a
+ * rajada e a mensagem da vez, uma por linha.
  */
 export async function iniciarTurno(deps, { canal, entrada, contexto = null, prazoMs } = {}) {
   const d = resolver(deps);
   if (!CANAIS_DO_MOTOR.includes(canal)) throw new TypeError(`motor: canal fora de CANAIS_DO_MOTOR (${String(canal)})`);
   const texto = typeof entrada?.texto === "string" ? entrada.texto.trim() : "";
   const transcricao = typeof entrada?.transcricao === "string" ? entrada.transcricao.trim() : "";
-  if (!texto && !transcricao) throw new TypeError("motor: a entrada precisa de texto ou transcrição");
+  const legenda = itemDaEntrada(entrada?.legenda, TIPOS_DE_ANEXO, "legenda", { exigeTexto: true });
+  const compartilhado = itemDaEntrada(entrada?.compartilhado, TIPOS_COMPARTILHADOS, "compartilhado", { exigeTexto: true });
+  const anteriores = (Array.isArray(entrada?.anteriores) ? entrada.anteriores : [])
+    .map((a, i) => itemDaEntrada(a, TIPOS_DE_MENSAGEM, `anteriores[${i}]`, { exigeTexto: false }))
+    .filter(Boolean);
+  if (!texto && !transcricao && !legenda && !compartilhado && anteriores.length === 0) {
+    throw new TypeError("motor: a entrada precisa de texto, transcrição, legenda, conteúdo compartilhado ou mensagens anteriores");
+  }
+  const daVez = texto || transcricao || legenda?.texto || compartilhado?.texto || "";
+  const registro = [...anteriores.map((a) => a.texto ?? semConteudo(a.tipo)), daVez].filter(Boolean).join("\n");
   const chegada = d.relogio();
   const t = {
-    turnoId: uuidv4(), canal, texto: texto || null, transcricao: transcricao || null,
-    tarefaId: contexto?.tarefaId ?? null, chegada,
+    turnoId: uuidv4(), canal, texto: texto || null, transcricao: transcricao || null, legenda, compartilhado, anteriores,
+    registro, tarefaId: contexto?.tarefaId ?? null, chegada,
     prazoFinal: chegada.getTime() + (prazoMs ?? d.agente.orcamentoMs[canal]),
   };
-  await d.loja.abrirTurno({ id: t.turnoId, canal, entrada: texto || transcricao });
+  await d.loja.abrirTurno({ id: t.turnoId, canal, entrada: registro });
   const resultado = naFila(canal, () => executarTurno(d, t));
   return { turnoId: t.turnoId, resultado };
 }

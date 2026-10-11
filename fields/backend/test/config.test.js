@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { carregarConfig, ErroConfig, ORCAMENTO_MAX_S } from "../src/config.js";
+import { carregarConfig, ErroConfig, LESCHATS_TIMEOUT_S, ORCAMENTO_MAX_S, ORCAMENTO_WHATSAPP_MAX_S } from "../src/config.js";
 import { gerarHashSenha } from "../src/auth/sessao.js";
 import { definirSaida, log } from "../src/lib/log.js";
 
@@ -134,4 +134,88 @@ test("agente: valores lidos do env, e os inválidos listados pelo NOME, sem o va
     assert.ok(!err.message.includes("turbo-123"), "o valor não aparece na mensagem");
     return true;
   });
+});
+
+// ─── A3 · o WhatsApp (Les Chats) ───
+
+const SEGREDO_LC = "segredo-hmac-da-les-chats-0123456789abc";
+
+test("whatsapp: desligado por padrão, sem exigir nada (o servidor sobe como antes)", () => {
+  const { whatsapp } = carregarConfig(VALIDO);
+  assert.deepEqual(whatsapp, { habilitado: false, segredo: null, donoWaId: null, templateJanelaFechada: null });
+  assert.ok(Object.isFrozen(whatsapp));
+});
+
+test("whatsapp: WHATSAPP_HABILITADO exige LESCHATS_SEGREDO e FIELDS_DONO_WA_ID (pelo nome); com eles, carrega", () => {
+  assert.throws(() => carregarConfig({ ...VALIDO, WHATSAPP_HABILITADO: "true" }), (err) => {
+    assert.deepEqual(err.problemas.faltando, ["LESCHATS_SEGREDO", "FIELDS_DONO_WA_ID"]);
+    return true;
+  });
+  const c = carregarConfig({
+    ...VALIDO, WHATSAPP_HABILITADO: "sim", LESCHATS_SEGREDO: SEGREDO_LC, FIELDS_DONO_WA_ID: " 5511999998888 ",
+    LESCHATS_TEMPLATE_JANELA_FECHADA: "hello_world",
+  });
+  assert.deepEqual(c.whatsapp, { habilitado: true, segredo: SEGREDO_LC, donoWaId: "5511999998888", templateJanelaFechada: "hello_world" });
+  // Sem o agente ligado NÃO é erro: desligar o agente às pressas não pode derrubar o servidor inteiro.
+  assert.equal(c.agente.habilitado, false);
+});
+
+test("whatsapp: segredo curto ou com espaço, wa_id fora do formato e nome de template inválido — recusados pelo nome, sem o valor", () => {
+  const ligado = { ...VALIDO, WHATSAPP_HABILITADO: "1", FIELDS_DONO_WA_ID: "5511999998888" };
+  assert.throws(() => carregarConfig({ ...ligado, LESCHATS_SEGREDO: "curto-demais-0123" }), (err) => {
+    assert.deepEqual(err.problemas.curtas, ["LESCHATS_SEGREDO"]);
+    assert.ok(!err.message.includes("curto-demais-0123"));
+    return true;
+  });
+  // O espaço colado no Railway viraria 403 em toda mensagem, com cara de segredo errado.
+  for (const comEspaco of [`${SEGREDO_LC}\n`, ` ${SEGREDO_LC}`, `${SEGREDO_LC.slice(0, 10)} ${SEGREDO_LC.slice(10)}`]) {
+    assert.throws(() => carregarConfig({ ...ligado, LESCHATS_SEGREDO: comEspaco }), (err) => {
+      assert.deepEqual(err.problemas.invalidas.map((p) => p.split(" ")[0]), ["LESCHATS_SEGREDO"]);
+      assert.ok(!err.message.includes(SEGREDO_LC.slice(0, 10)), "o valor não aparece na mensagem");
+      return true;
+    });
+  }
+  for (const waId of ["+5511999998888", "55 11 99999-8888", "1234567", "1234567890123456", "abc"]) {
+    assert.throws(() => carregarConfig({ ...ligado, LESCHATS_SEGREDO: SEGREDO_LC, FIELDS_DONO_WA_ID: waId }), (err) => {
+      assert.deepEqual(err.problemas.invalidas.map((p) => p.split(" ")[0]), ["FIELDS_DONO_WA_ID"], waId);
+      return true;
+    });
+  }
+  for (const nome of ["Hello World", "hello-world", "olá"]) {
+    assert.throws(() => carregarConfig({ ...VALIDO, LESCHATS_TEMPLATE_JANELA_FECHADA: nome }), (err) => {
+      assert.deepEqual(err.problemas.invalidas.map((p) => p.split(" ")[0]), ["LESCHATS_TEMPLATE_JANELA_FECHADA"], nome);
+      return true;
+    });
+  }
+  // Desligado, um segredo BOM continua na config: é com ele que a rota prova que a requisição é da
+  // Les Chats e responde handoff NO_BOT (ticket na hora) em vez de 503. Um torto vira null — e não
+  // impede o servidor de subir com o webhook desligado.
+  assert.equal(carregarConfig({ ...VALIDO, LESCHATS_SEGREDO: SEGREDO_LC }).whatsapp.segredo, SEGREDO_LC);
+  for (const torto of ["curto-demais-0123", ` ${SEGREDO_LC}`, `${SEGREDO_LC}\n`]) {
+    assert.equal(carregarConfig({ ...VALIDO, LESCHATS_SEGREDO: torto }).whatsapp.segredo, null, JSON.stringify(torto.slice(0, 5)));
+  }
+});
+
+test("whatsapp: FIELDS_DONO_WA_ID aceita as duas grafias do celular brasileiro (com e sem o nono dígito)", () => {
+  const ligado = { ...VALIDO, WHATSAPP_HABILITADO: "1", LESCHATS_SEGREDO: SEGREDO_LC };
+  for (const waId of ["5511999998888", "551199998888"]) {
+    assert.equal(carregarConfig({ ...ligado, FIELDS_DONO_WA_ID: waId }).whatsapp.donoWaId, waId);
+  }
+});
+
+test("whatsapp: ligado, o orçamento do WhatsApp vai no máximo a 110 s — o POST da Les Chats corta em 120 s", () => {
+  assert.deepEqual([LESCHATS_TIMEOUT_S, ORCAMENTO_WHATSAPP_MAX_S], [120, 110]);
+  const ligado = { ...VALIDO, WHATSAPP_HABILITADO: "1", LESCHATS_SEGREDO: SEGREDO_LC, FIELDS_DONO_WA_ID: "5511999998888" };
+  assert.equal(carregarConfig(ligado).agente.orcamentoMs.whatsapp, 100_000, "o padrão cabe");
+  assert.equal(carregarConfig({ ...ligado, AGENTE_ORCAMENTO_WHATSAPP_S: "110" }).agente.orcamentoMs.whatsapp, 110_000);
+  for (const acima of ["111", "240"]) {
+    assert.throws(() => carregarConfig({ ...ligado, AGENTE_ORCAMENTO_WHATSAPP_S: acima }), (err) => {
+      assert.deepEqual(err.problemas.invalidas.map((p) => p.split(" ")[0]), ["AGENTE_ORCAMENTO_WHATSAPP_S"], acima);
+      assert.match(err.problemas.invalidas[0], /no máximo 110 com WHATSAPP_HABILITADO: acima disso o POST da Les Chats \(120 s\) corta/);
+      return true;
+    });
+  }
+  // O orçamento da tela não tem nada com isso; e, desligado, o teto é o de sempre (240).
+  assert.equal(carregarConfig({ ...ligado, AGENTE_ORCAMENTO_WEB_S: "240" }).agente.orcamentoMs.web, 240_000);
+  assert.equal(carregarConfig({ ...VALIDO, AGENTE_ORCAMENTO_WHATSAPP_S: "240" }).agente.orcamentoMs.whatsapp, 240_000);
 });

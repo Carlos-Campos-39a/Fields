@@ -8,6 +8,7 @@ import { criarApp } from "./src/app.js";
 import { log } from "./src/lib/log.js";
 import { REPARO_POS_DEPLOY_MS, repararDivergencia } from "./src/db/migracoes.js";
 import { agendarRecuperacaoDeOrfaos } from "./src/servicos/turnos.js";
+import { agendarLimpezaDeEventos } from "./src/servicos/whatsapp.js";
 
 let config;
 try {
@@ -33,6 +34,11 @@ initDB(pool)
         porta: config.porta,
         agente_habilitado: config.agente.habilitado,
         agente_modelo: config.agente.modeloFalso ? "modelo-falso" : config.agente.modelo,
+        // A3: diante de um 503 whatsapp_desligado (ou de um ticket NO_BOT) na Les Chats, é a primeira
+        // coisa a olhar. Desligado, o webhook responde handoff a quem assina e 503 sem o segredo.
+        whatsapp_habilitado: config.whatsapp.habilitado,
+        whatsapp_desligado_responde: config.whatsapp.habilitado ? undefined : config.whatsapp.segredo ? "HANDOFF" : "503",
+        whatsapp_template_janela_fechada: Boolean(config.whatsapp.templateJanelaFechada),
       });
       // A instância anterior (A0 na primeira subida, ou depois de um rollback) segue escrevendo no
       // jsonb até o healthcheck desta passar — e o reparo do boot já rodou. Uma segunda passada,
@@ -44,6 +50,9 @@ initDB(pool)
       // o da queda de agora há pouco (ou o da instância velha deste deploy) ainda não tem. A cada
       // minuto, então — senão a tela mostraria "Trabalhando…" até o próximo deploy.
       agendarRecuperacaoDeOrfaos(pool);
+      // A3: os wamids guardados para a idempotência do webhook saem depois de 7 dias (contrato §6.1).
+      // Uma passada agora e uma por hora; a falha só loga.
+      agendarLimpezaDeEventos(pool);
     });
   })
   .catch((err) => {

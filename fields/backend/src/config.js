@@ -119,6 +119,66 @@ function configDoAgente(env, problemas) {
   });
 }
 
+// ─── A3 · o WhatsApp (webhook da Les Chats) ───
+
+/**
+ * wa_id do WhatsApp: o número com DDI, só dígitos (E.164 sem o "+"), como a Les Chats manda. As duas
+ * grafias do celular brasileiro (com e sem o nono dígito) passam aqui e valem como o mesmo número na
+ * allowlist (integracoes/leschats.mesmoWaId).
+ */
+const WA_ID = /^\d{8,15}$/;
+/** Nome de template da Meta: minúsculas, dígitos e "_" (o `hello_world` do número de teste). */
+const NOME_TEMPLATE = /^[a-z0-9_]{1,512}$/;
+
+/** O timeout do POST da Les Chats para o webhook (ajuste do contrato, plano §0). */
+export const LESCHATS_TIMEOUT_S = 120;
+/**
+ * O maior orçamento de turno do WhatsApp com o webhook ligado: o timeout da Les Chats menos uma folga
+ * para a fila do canal, o fim do turno e a resposta voltarem. Acima disso, todo turno longo estoura o
+ * POST: ela retenta, a retentativa recebe handoff BOT_FAILURE (ticket), e o turno original termina e
+ * escreve no banco sem o Carlos ver a resposta.
+ */
+export const ORCAMENTO_WHATSAPP_MAX_S = LESCHATS_TIMEOUT_S - 10;
+
+const segredoUtilizavel = (s) => Boolean(s) && !/\s/.test(s) && s.length >= 32;
+
+/**
+ * A parte do WhatsApp. Só pesa quando WHATSAPP_HABILITADO está ligado: sem ela o servidor sobe como
+ * antes. Desligado, POST /api/agente/whatsapp responde {handoff: NO_BOT} a quem prova ser a Les Chats
+ * (o segredo, se estiver no env, continua valendo para isso) — a conversa vira ticket na hora — e,
+ * sem segredo, 503 (a Les Chats conta falha; ticket só depois da terceira, contrato §6.1).
+ *
+ * Com ela, o segredo e o dono passam a ser obrigatórios — um webhook ligado sem segredo recusaria
+ * tudo com 403 mudo, e sem o dono não há allowlist. O segredo é comparado BYTE A BYTE com o que a Les
+ * Chats usa para assinar: um espaço ou uma quebra de linha colados no Railway virariam um 403 em toda
+ * mensagem, com cara de "segredo errado". Por isso é recusado aqui, pelo nome, e não aparado em
+ * silêncio (aparar só deste lado também não bateria, se o espaço estiver do lado de lá).
+ *
+ * AGENTE_HABILITADO desligado com o WhatsApp ligado NÃO é erro de config: desligar o agente às pressas
+ * (custo, incidente) não pode derrubar o servidor inteiro. O webhook responde com um texto fixo.
+ */
+function configDoWhatsapp(env, problemas) {
+  const habilitado = flagLigada(env.WHATSAPP_HABILITADO);
+  const segredo = env.LESCHATS_SEGREDO ? String(env.LESCHATS_SEGREDO) : null;
+  const donoWaId = String(env.FIELDS_DONO_WA_ID ?? "").trim() || null;
+  const template = String(env.LESCHATS_TEMPLATE_JANELA_FECHADA ?? "").trim() || null;
+  if (habilitado) {
+    if (!segredo) problemas.faltando.push("LESCHATS_SEGREDO");
+    else if (/\s/.test(segredo)) problemas.invalidas.push("LESCHATS_SEGREDO (tem espaço ou quebra de linha: cole sem eles, nos dois lados)");
+    else if (segredo.length < 32) problemas.curtas.push("LESCHATS_SEGREDO");
+    if (!donoWaId) problemas.faltando.push("FIELDS_DONO_WA_ID");
+    else if (!WA_ID.test(donoWaId)) problemas.invalidas.push("FIELDS_DONO_WA_ID (só dígitos, com DDI e DDD: 5511…)");
+  }
+  if (template && !NOME_TEMPLATE.test(template)) {
+    problemas.invalidas.push("LESCHATS_TEMPLATE_JANELA_FECHADA (nome de template da Meta: minúsculas, dígitos e _)");
+  }
+  // Desligado, o segredo só é guardado se estiver bom: um torto não pode impedir o servidor de subir
+  // com o webhook desligado — e sem ele a rota cai no 503 de sempre.
+  return Object.freeze({
+    habilitado, segredo: habilitado || segredoUtilizavel(segredo) ? segredo : null, donoWaId, templateJanelaFechada: template,
+  });
+}
+
 export function carregarConfig(env = process.env) {
   const problemas = { faltando: [], curtas: [], invalidas: [] };
   for (const nome of OBRIGATORIAS) if (!env[nome]) problemas.faltando.push(nome);
@@ -127,6 +187,13 @@ export function carregarConfig(env = process.env) {
     problemas.invalidas.push("FIELDS_SENHA_HASH (gere com: node scripts/hash-senha.mjs)");
   }
   const agente = configDoAgente(env, problemas);
+  const whatsapp = configDoWhatsapp(env, problemas);
+  if (whatsapp.habilitado && agente.orcamentoMs.whatsapp > ORCAMENTO_WHATSAPP_MAX_S * 1000) {
+    problemas.invalidas.push(
+      `AGENTE_ORCAMENTO_WHATSAPP_S (no máximo ${ORCAMENTO_WHATSAPP_MAX_S} com WHATSAPP_HABILITADO: ` +
+      `acima disso o POST da Les Chats (${LESCHATS_TIMEOUT_S} s) corta antes da resposta)`
+    );
+  }
   if (problemas.faltando.length || problemas.curtas.length || problemas.invalidas.length) {
     throw new ErroConfig(problemas);
   }
@@ -141,5 +208,6 @@ export function carregarConfig(env = process.env) {
     segredoSessao: env.FIELDS_SEGREDO_SESSAO,
     apiToken: env.FIELDS_API_TOKEN,
     agente,
+    whatsapp,
   });
 }

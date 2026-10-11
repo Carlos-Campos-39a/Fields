@@ -2,11 +2,15 @@
 // falso e roda sem Postgres. O bootstrap (server.js) passa o pool real e o `estado` que o initDB
 // leu do banco ({comentariosMigrados}: a migração comentarios_v1 rodou ou não — ver db/schema.js).
 // `motor` é a costura do chat (A2b): o teste troca por ele o modelo e a persistência do agente
-// (rotas/agente.js); sem ele, o modelo sai da config e a persistência é o banco.
+// (rotas/agente.js); sem ele, o modelo sai da config e a persistência é o banco. As dependências do
+// motor são montadas UMA vez e divididas entre o chat da tela e o WhatsApp (A3). `whatsapp` são as
+// costuras do webhook (rotas/whatsapp.js): a loja dos eventos e a espera do turno em voo.
 //
-// Ordem: log de request → rotas públicas (health, login) → exigirAuth → JSON → rotas protegidas
-// → tratador de erro. Sem pacote cors e sem cabeçalho CORS nenhum: o front chega pela mesma
-// origem (rewrite da Vercel em produção, proxy do Vite em dev).
+// Ordem: log de request → rotas públicas (health, login, o webhook do WhatsApp) → exigirAuth → JSON
+// → rotas protegidas → tratador de erro. O webhook é público porque quem o autentica é o HMAC da Les
+// Chats, e vem antes do express.json porque lê o corpo CRU (a assinatura é sobre os bytes).
+// Sem pacote cors e sem cabeçalho CORS nenhum: o front chega pela mesma origem (rewrite da Vercel em
+// produção, proxy do Vite em dev).
 
 import express from "express";
 import { log } from "./lib/log.js";
@@ -23,14 +27,18 @@ import { rotasComentarios } from "./rotas/comentarios.js";
 import { rotasHistorico } from "./rotas/historico.js";
 import { rotasOps } from "./rotas/ops.js";
 import { rotasOntologia } from "./rotas/ontologia.js";
-import { rotasAgente } from "./rotas/agente.js";
+import { criarDepsDoMotor, rotasAgente } from "./rotas/agente.js";
+import { rotasWhatsapp } from "./rotas/whatsapp.js";
 
-/** As únicas rotas que respondem sem credencial. Um teste trava esta lista. */
-export const ROTAS_PUBLICAS = Object.freeze(["GET /api/health", "POST /api/auth/login"]);
+/**
+ * As únicas rotas que respondem sem credencial de sessão. Um teste trava esta lista. O webhook do
+ * WhatsApp (A3) tem a credencial dele — o HMAC da Les Chats, conferido na própria rota.
+ */
+export const ROTAS_PUBLICAS = Object.freeze(["GET /api/health", "POST /api/auth/login", "POST /api/agente/whatsapp"]);
 
 const PG_CODIGO = /^[0-9A-Z]{5}$/; // SQLSTATE: seguro de logar, ao contrário da mensagem do pg
 
-export function criarApp({ config, db, estado, limitador = criarLimitador(), motor } = {}) {
+export function criarApp({ config, db, estado, limitador = criarLimitador(), motor, whatsapp } = {}) {
   if (!config) throw new TypeError("criarApp: config é obrigatória");
   if (!db) throw new TypeError("criarApp: db é obrigatório");
   // Sem default: um app que "achasse" o modo dos comentários leria de um lugar e escreveria em outro.
@@ -42,13 +50,18 @@ export function criarApp({ config, db, estado, limitador = criarLimitador(), mot
   app.set("trust proxy", true); // Railway (e a Vercel na frente): req.ip vem do X-Forwarded-For
   app.disable("x-powered-by");
 
-  const publicas = [rotasSaude(), rotasLogin({ config, limitador })];
+  const depsMotor = criarDepsDoMotor({ db, estado, config, motor });
+  const publicas = [
+    rotasSaude(), rotasLogin({ config, limitador }),
+    // A3: o webhook da Les Chats. Lê o corpo cru com o próprio express.raw.
+    rotasWhatsapp({ db, estado, config, depsMotor, whatsapp }),
+  ];
   const protegidas = [
     rotasAuth(),
     rotasEntradas({ db, estado }), rotasProjetos({ db, estado }), rotasReunioes({ db, estado }),
     rotasComentarios({ db, estado }), rotasHistorico({ db, estado }),
     // A2: a ontologia (catálogo, operações, prompt) e o que a tela pede ao agente sem o modelo.
-    rotasOps({ db, estado }), rotasOntologia(), rotasAgente({ db, estado, config, motor }),
+    rotasOps({ db, estado }), rotasOntologia(), rotasAgente({ db, estado, config, depsMotor }),
   ];
   const tabela = tabelaDeRotas("/api", [...publicas, ...protegidas]);
   const rotaDe = (req) => rotaDaTabela(req, tabela);
