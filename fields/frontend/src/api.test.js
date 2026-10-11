@@ -115,6 +115,33 @@ describe("req (fetch falso)", () => {
     ]);
   });
 
+  // O contrato da §9.2: o corpo do chat é estrito no backend (z.strictObject) — uma chave a mais,
+  // ou o vínculo inteiro da tela no lugar do id, viraria 400 ARGUMENTOS_INVALIDOS.
+  it("chat do agente: método, caminho e corpo", async () => {
+    const chamadas = responder(202, { turno_id: "t1" });
+    await api.chatAgente("oi");
+    await api.chatAgente("oi", { tarefa_id: "k9", nome: "não vai" });
+    await api.chatAgente("oi", {});
+    await api.getTurno("t/1");
+    await api.getConversa();
+    await api.novaConversa();
+    expect(chamadas.map((c) => [c.opcoes.method, c.url, c.opcoes.body])).toEqual([
+      ["POST", "/api/agente/chat", JSON.stringify({ texto: "oi" })],
+      ["POST", "/api/agente/chat", JSON.stringify({ texto: "oi", contexto: { tarefa_id: "k9" } })],
+      ["POST", "/api/agente/chat", JSON.stringify({ texto: "oi" })],
+      ["GET", "/api/agente/turnos/t%2F1", undefined],
+      ["GET", "/api/agente/conversa?canal=web&limite=30", undefined],
+      ["POST", "/api/agente/nova-conversa", JSON.stringify({ canal: "web" })],
+    ]);
+  });
+
+  it("503 AGENTE_DESLIGADO do chat chega com o código", async () => {
+    responder(503, { erro: "O assistente está desligado neste servidor.", codigo: "AGENTE_DESLIGADO" });
+    const erro = await api.chatAgente("oi").catch((e) => e);
+    expect(erro).toBeInstanceOf(ApiError);
+    expect(erro.codigo).toBe("AGENTE_DESLIGADO");
+  });
+
   it("resumo do dia com e sem data", async () => {
     const chamadas = responder(200, { resultado: {} });
     await api.getResumoDoDia();

@@ -1,9 +1,10 @@
-/* A home (home/HomePage.jsx). Só tokens; a R3 troca o miolo pelo chat. */
+/* A Home = o chat (home/HomePage.jsx). Só tokens. A página não rola: rola o fio, e o composer fica
+   fixo embaixo dele (no celular, logo acima da MobileNav). */
 
 .home {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
   background: var(--bg);
   color: var(--text);
 }
@@ -37,22 +38,57 @@
   letter-spacing: -0.01em;
 }
 
+.direita,
 .acoes {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
 }
 
-/* ── Miolo ────────────────────────────────────────────────────────────────────────────── */
-.centro {
-  display: flex;
+/* ── O fio ────────────────────────────────────────────────────────────────────────────── */
+.rolagem {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.coluna {
+  display: flex;
   flex-direction: column;
   gap: var(--sp-5);
   width: 100%;
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: clamp(var(--sp-6), 12vh, 120px) var(--sp-5) var(--sp-7);
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+}
+
+.carregando {
+  display: flex;
+  justify-content: center;
+  color: var(--text-3);
+}
+
+.falhaCarga {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.falhaIcone {
+  color: var(--warning-ink);
+}
+
+/* ── O bloco de hoje: saudação + card ─────────────────────────────────────────────────── */
+.hoje {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding-top: var(--sp-5);
 }
 
 .saudacao {
@@ -76,99 +112,41 @@
   color: var(--text-2);
 }
 
-.dicas {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  margin-top: calc(-1 * var(--sp-2));
-}
-
-.dicasRotulo {
-  font-size: var(--fs-xs);
-  color: var(--text-3);
-}
-
-/* ── Recentes: um cartão com linhas separadas por 1px ─────────────────────────────────── */
-.recentes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  margin-top: var(--sp-3);
-}
-
-.lista {
-  overflow: hidden;
-  list-style: none;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
-.lista > li + li {
-  border-top: 1px solid var(--border);
-}
-
-.item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  min-height: 48px;
-  padding: var(--sp-3) var(--sp-4);
-  background: transparent;
-  border: 0;
-  color: var(--text);
-  font-size: var(--fs-base);
-  text-align: left;
-  transition: background-color var(--dur-fast) ease;
-}
-
-.item:hover {
-  background: var(--surface-2);
-}
-
-/* O anel por dentro: o cartão tem overflow hidden. */
-.item:focus-visible {
-  outline-offset: -2px;
-}
-
-.tipo {
-  display: inline-flex;
+/* ── O composer, fixo embaixo do fio ──────────────────────────────────────────────────── */
+.rodape {
   flex-shrink: 0;
-  color: var(--text-2);
+  padding: var(--sp-2) var(--sp-5) var(--sp-4);
+  background: var(--bg);
 }
 
-.tituloItem {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-weight: var(--fw-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.meta {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--sp-1);
-  font-size: var(--fs-xs);
-  color: var(--text-3);
+.rodapeColuna {
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 /* ── Celular: tema, workspace e Sair ficam na MobileNav ───────────────────────────────── */
 @media (max-width: 767.98px) {
   .topo {
-    padding: 0 var(--sp-4);
+    padding: 0 var(--sp-2) 0 var(--sp-4);
   }
 
   .acoes {
     display: none;
   }
 
-  .centro {
-    padding: var(--sp-6) var(--sp-4) var(--sp-5);
+  .coluna {
+    padding: var(--sp-4) var(--sp-4) var(--sp-4);
+  }
+
+  .hoje {
+    padding-top: var(--sp-2);
+  }
+
+  .titulo {
+    font-size: var(--fs-lg);
+  }
+
+  .rodape {
+    padding: var(--sp-2) var(--sp-4) var(--sp-3);
   }
 }

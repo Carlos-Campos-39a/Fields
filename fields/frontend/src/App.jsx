@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { ConfirmDialog, useToast } from "./ui/index.js";
+import { ehAtalhoDoComposer } from "./lib/atalhos.js";
 import { useOntologia } from "./lib/ontologia.js";
 import { useEhMobile } from "./lib/useEhMobile.js";
 import { useFalha } from "./lib/useFalha.js";
@@ -20,16 +21,18 @@ import styles from "./App.module.css";
 
 /**
  * A casca do Fields'. Guarda só o que é de verdade global — a lista de entradas com o filtro e a
- * busca (a barra lateral, os cartões, a home e o anterior/próxima leem dela) — e escolhe a tela
+ * busca (a barra lateral, os cartões e o anterior/próxima leem dela) — e escolhe a tela
  * pela rota (lib/useHashRoute.js). Cada tela mora na sua pasta e cuida do próprio estado.
  *
  *   desktop  barra lateral + painel (topo, conteúdo da rota, caixa de captura em #/notas)
  *   celular  UMA coisa por vez + a MobileNav embaixo: #/notas é a lista (a barra lateral em
  *            largura cheia), #/notas/:id e as outras vistas são o painel. Toda vista é alcançável.
- *   #/       a home ocupa a tela toda (sem barra lateral), nos dois.
+ *   #/       a home (o chat com o assistente) ocupa a tela toda (sem barra lateral), nos dois.
  *
  * Toda troca de rota passa pela guarda de saída (useHashRoute): com uma edição não salva aberta,
  * o diálogo daqui pergunta antes — a lista, o topo e a barra inferior não precisam saber disso.
+ * O ⌘K (Ctrl+K) de qualquer tela vai para a home e põe o foco no composer — pelo mesmo navegar,
+ * então uma edição aberta pergunta antes também aqui.
  */
 export default function App() {
   const { rota, navegar, saidaPendente, confirmarSaida, ficar } = useHashRoute();
@@ -75,6 +78,16 @@ export default function App() {
     if (conteudoRef.current) conteudoRef.current.scrollTop = 0;
   }, [rota.view, rota.id]);
 
+  // Saiu da home: a lista relê. O chat avisa o que o agente escreveu (onDadosMudaram), mas a escrita
+  // que ele não viu terminar — ou a que veio pelo WhatsApp enquanto a home estava aberta — só
+  // aparece assim, sem F5.
+  const viewAnterior = useRef(rota.view);
+  useEffect(() => {
+    const antes = viewAnterior.current;
+    viewAnterior.current = rota.view;
+    if (antes === "home" && rota.view !== "home" && jaCarregou.current) carregar();
+  }, [rota.view, carregar]);
+
   function aoCriar(entry) {
     setEntries((prev) => [entry, ...prev]);
     toast.show({ message: `Salvo como ${rotulo("tipo_entrada", entry.type, { capitalizar: false }) || "entrada"}`, tone: "success" });
@@ -91,6 +104,30 @@ export default function App() {
 
   const abrirEntrada = useCallback((entry) => navegar({ view: "notas", id: entry.id }), [navegar]);
 
+  // ⌘K / Ctrl+K: de qualquer tela, o composer da home. O pedido de foco fica guardado até a home
+  // montar (ou, já nela, até o composer atender). Com um diálogo nativo aberto (o "Descartar as
+  // alterações?"), o atalho não faz nada: o diálogo é modal e a pergunta dele vem primeiro.
+  const [focoNoComposer, setFocoNoComposer] = useState(false);
+  const atenderFoco = useCallback(() => setFocoNoComposer(false), []);
+  useEffect(() => {
+    const aoTeclar = (e) => {
+      if (e.defaultPrevented || !ehAtalhoDoComposer(e)) return;
+      if (document.querySelector("dialog[open]")) return;
+      e.preventDefault(); // o Ctrl+K do navegador (busca na barra de endereço) não dispara junto
+      setFocoNoComposer(true);
+      navegar({ view: "home" });
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [navegar]);
+
+  // "Continuar editando" no diálogo da saída: o ⌘K que levou até ele foi desistido junto — senão o
+  // foco pendente esperaria a próxima visita à home e roubaria o cursor lá.
+  const ficarNaTela = useCallback(() => {
+    setFocoNoComposer(false);
+    ficar();
+  }, [ficar]);
+
   const { view, id } = rota;
   const idx = id ? entries.findIndex((e) => e.id === id) : -1;
   const entradaDaLista = idx >= 0 ? entries[idx] : null;
@@ -105,8 +142,9 @@ export default function App() {
       <HomePage
         onClose={() => navegar({ view: "notas" })}
         onCreated={aoCriar}
-        recentEntries={entries}
-        onOpenEntry={abrirEntrada}
+        onDadosMudaram={carregar}
+        pedirFoco={focoNoComposer}
+        aoAtenderFoco={atenderFoco}
       />
     );
   } else if (view === "notas") {
@@ -180,7 +218,7 @@ export default function App() {
         confirmLabel="Descartar"
         cancelLabel="Continuar editando"
         onConfirm={confirmarSaida}
-        onCancel={ficar}
+        onCancel={ficarNaTela}
       />
     </div>
   );
