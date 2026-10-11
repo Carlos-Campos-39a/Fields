@@ -1,0 +1,191 @@
+/* A caixa do chat (home/Composer.jsx). Mesma linguagem da caixa de captura (InputBar): borda de
+   1px, anel na caixa inteira, sem sombra. */
+
+.raiz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* ── Tarefa vinculada ─────────────────────────────────────────────────────────────────── */
+.vinculo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.vinculoRotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 0 0 var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.caminho {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sep {
+  color: var(--text-3);
+}
+
+.tarefa {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* ── A caixa ──────────────────────────────────────────────────────────────────────────── */
+.caixa {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--dur-fast) ease;
+}
+
+.caixa:hover {
+  border-color: var(--text-3);
+}
+
+.caixa:focus-within {
+  border-color: var(--focus-ring);
+  outline: 1px solid var(--focus-ring);
+}
+
+.texto {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  max-height: 200px;
+  padding: 7px 0;
+  overflow-y: auto;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  resize: none;
+  /* Cresce com o texto onde o navegador sabe; no resto, o Composer ajusta a altura pelo JS. */
+  field-sizing: content;
+}
+
+.texto:focus,
+.texto:focus-visible {
+  outline: none;
+}
+
+.texto::placeholder {
+  color: var(--text-3);
+}
+
+.acoes {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* Enviar: o Button primário (tinta invertida) quadrado. Duas classes: vence o .md do Button. */
+.acoes .enviar {
+  width: 36px;
+  padding: 0;
+}
+
+/* ── Linha de baixo: estado + dica de teclado (ou o contador perto do teto) ───────────── */
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 22px;
+  padding: 0 var(--sp-1);
+}
+
+.estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.vaiComo {
+  color: var(--text-3);
+}
+
+/* Link de texto em --accent-ink (o laranja puro reprova como texto). */
+.link {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--accent-ink);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dica,
+.contador {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.contador,
+.contadorExcedido {
+  font-variant-numeric: tabular-nums;
+}
+
+.contadorExcedido {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+  /* 16px: abaixo disso o Safari do iPhone dá zoom na página ao focar a caixa. */
+  .texto {
+    font-size: var(--fs-md);
+  }
+
+  /* Teclado de celular não tem Shift+Enter nem ⌘K. */
+  .dica {
+    display: none;
+  }
+}

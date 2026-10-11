@@ -1,0 +1,24 @@
+/* A resposta do agente (home/TextoDoAgente.jsx): Lora, como o corpo de nota (plano §4). */
+
+.texto {
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  line-height: var(--lh-reading);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.paragrafo + .paragrafo {
+  margin-top: var(--sp-3);
+}
+
+.texto strong {
+  font-weight: var(--fw-semibold);
+}
+
+/* O marcador encosta à esquerda sem recuo de lista: as linhas são <br>, não <li>. */
+.marcador {
+  display: inline-block;
+  width: 1.1em;
+  color: var(--text-3);
+}

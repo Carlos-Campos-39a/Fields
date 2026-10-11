@@ -1,18 +1,22 @@
-import { useEffect, useState } from "react";
-import { Badge, Button, Icon, Logo, SectionLabel } from "../ui/index.js";
-import { aparenciaDoTipo } from "../components/tipoEntrada.js";
-import { relativeDate, saudacao } from "../lib/dates.js";
-import { useOntologia } from "../lib/ontologia.js";
-import { DICAS_DE_PREFIXO } from "../lib/parseInput.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button, Icon, Logo, Spinner } from "../ui/index.js";
+import { hojeISO, saudacao } from "../lib/dates.js";
 import { useSair } from "../auth/useSair.js";
 import { ThemeToggle } from "../layout/ThemeToggle.jsx";
-import { InputBar } from "./InputBar.jsx";
+import { coladoAposRolar, montarFio } from "./chat.js";
+import { useChat } from "./useChat.js";
+import { Composer } from "./Composer.jsx";
+import { Fio } from "./Fio.jsx";
+import { HojeCard } from "./HojeCard.jsx";
 import styles from "./HomePage.module.css";
 
 const UM_MINUTO = 60_000;
+// A esta distância do fim (px), o fio acompanha o que chega. Mais longe, o Carlos subiu para ler
+// alguma coisa, e a resposta nova não pode arrancá-lo de lá.
+const COLADO_PX = 96;
 
-// A saudação muda ao meio-dia e às 18h (hora de Brasília, lib/dates.js). Calculada só no render,
-// uma home aberta de manhã seguia dizendo "Bom dia" à tarde.
+// A saudação muda ao meio-dia e às 18h, e o card "Hoje" vira à meia-noite (hora de Brasília,
+// lib/dates.js). Calculado só no render, uma Home aberta de manhã seguia dizendo "Bom dia" à tarde.
 function useAgora() {
   const [agora, setAgora] = useState(() => new Date());
   useEffect(() => {
@@ -23,17 +27,85 @@ function useAgora() {
 }
 
 /**
- * Rota #/ — a home. No monólito era uma sobreposição fixa (showHome) por cima do workspace; agora é
- * a tela da rota, e "fechar" é ir para #/notas. A R3 troca o miolo pelo chat do agente.
- * No desktop não há barra lateral nem TopBar aqui: o cabeçalho traz o caminho para o workspace,
- * o tema e o Sair. No celular os três ficam na MobileNav (o CSS esconde estes).
- * "Salvo como …" é o toast do App (aoCriar) — o aviso inline daqui repetia o mesmo recado.
+ * Rota #/ — a Home é o chat com o assistente (R3). Em cima, o fio da conversa (home/Fio.jsx), com a
+ * saudação e o card "Hoje" no ponto onde o dia de hoje começa; embaixo, fixo, o composer.
+ * No desktop não há barra lateral nem TopBar aqui: o cabeçalho traz o caminho para o workspace, o
+ * tema e o Sair (no celular os três ficam na MobileNav, e o CSS os esconde). "Nova conversa" fica
+ * nos dois.
+ *
+ * `onCreated` é o aoCriar do App (o "Salvar como nota" e o composer sem assistente);
+ * `onDadosMudaram` é o carregar do App: o agente (ou um desfazer) mexeu nos dados, e a lista de
+ * entradas da barra lateral, dos cartões e de #/notas relê;
+ * `pedirFoco`/`aoAtenderFoco` são o ⌘K do App.
  */
-export function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
-  const { rotulo } = useOntologia();
+export function HomePage({ onClose, onCreated, onDadosMudaram, pedirFoco, aoAtenderFoco }) {
   const { sair, saindo } = useSair();
   const agora = useAgora();
-  const recentes = recentEntries.slice(0, 5);
+  const hoje = hojeISO(agora);
+  const chat = useChat({ onCreated, onDadosMudaram });
+  const { estado } = chat;
+  const itens = useMemo(() => montarFio(estado.turnos, { hoje, corte: estado.corte }), [estado.turnos, estado.corte, hoje]);
+
+  // ── Rolagem colada no fim ──
+  const rolagemRef = useRef(null);
+  const colunaRef = useRef(null);
+  const colado = useRef(true);
+
+  const irParaOFim = useCallback(() => {
+    const el = rolagemRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+
+  // Tudo o que muda a altura do fio (turno novo, resposta, chips, o card "Hoje" que chega depois,
+  // a fonte que carrega) passa por aqui: colado no fim, continua no fim. A área de rolagem também é
+  // observada: ela encolhe sem a coluna mudar quando o composer cresce, o chip da tarefa aparece ou
+  // o teclado do celular sobe.
+  useEffect(() => {
+    const coluna = colunaRef.current;
+    const rolagem = rolagemRef.current;
+    if (!coluna || typeof ResizeObserver === "undefined") return undefined;
+    const observador = new ResizeObserver(() => {
+      if (colado.current) irParaOFim();
+    });
+    observador.observe(coluna);
+    if (rolagem) observador.observe(rolagem);
+    return () => observador.disconnect();
+  }, [irParaOFim]);
+
+  // Descola só quando o Carlos SOBE (chat.js coladoAposRolar diz por quê).
+  const topoAnterior = useRef(0);
+  function aoRolar() {
+    const el = rolagemRef.current;
+    if (!el) return;
+    colado.current = coladoAposRolar(colado.current, {
+      distancia: el.scrollHeight - el.scrollTop - el.clientHeight,
+      topo: el.scrollTop,
+      topoAnterior: topoAnterior.current,
+      limite: COLADO_PX,
+    });
+    topoAnterior.current = el.scrollTop;
+  }
+
+  function enviar(texto, vinculo) {
+    colado.current = true; // quem acabou de mandar quer ver a resposta
+    chat.enviar(texto, vinculo);
+  }
+
+  const ultimoComId = [...estado.turnos].reverse().find((t) => t.turno_id);
+  const jaNova = Boolean(estado.corte) && ultimoComId?.turno_id === estado.corte;
+  const podeNovaConversa = Boolean(ultimoComId) && !jaNova && !chat.ocupado;
+
+  const blocoHoje = (
+    <div className={styles.hoje}>
+      <div className={styles.saudacao}>
+        <h1 className={styles.titulo}>{saudacao(agora)}, Carlos.</h1>
+        <p className={styles.sub}>
+          {estado.desligado ? "O assistente está desligado: o que você escrever vira nota." : "O que você precisa hoje?"}
+        </p>
+      </div>
+      <HojeCard hoje={hoje} versao={estado.mudancas + estado.capturas} />
+    </div>
+  );
 
   return (
     <div className={styles.home}>
@@ -42,62 +114,62 @@ export function HomePage({ onClose, onCreated, recentEntries, onOpenEntry }) {
           <Logo size={18} className={styles.logo} />
           <span className={styles.nome}>Fields'</span>
         </span>
-        <div className={styles.acoes}>
-          <Button variant="ghost" size="sm" iconRight={<Icon name="chevron-right" size={14} />} onClick={onClose}>
-            Abrir workspace
+        <div className={styles.direita}>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Icon name="plus" size={14} />}
+            loading={estado.novaConversa === "PEDINDO"}
+            disabled={!podeNovaConversa}
+            title={jaNova ? "A próxima mensagem já começa uma conversa nova" : undefined}
+            onClick={chat.novaConversa}
+          >
+            Nova conversa
           </Button>
-          <ThemeToggle />
-          <Button variant="ghost" size="sm" icon={<Icon name="log-out" size={14} />} loading={saindo} onClick={sair}>
-            Sair
-          </Button>
+          <div className={styles.acoes}>
+            <Button variant="ghost" size="sm" iconRight={<Icon name="chevron-right" size={14} />} onClick={onClose}>
+              Abrir workspace
+            </Button>
+            <ThemeToggle />
+            <Button variant="ghost" size="sm" icon={<Icon name="log-out" size={14} />} loading={saindo} onClick={sair}>
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className={styles.centro}>
-        <div className={styles.saudacao}>
-          <h1 className={styles.titulo}>{saudacao(agora)}, Carlos.</h1>
-          <p className={styles.sub}>O que você quer capturar hoje?</p>
+      <div ref={rolagemRef} className={styles.rolagem} onScroll={aoRolar}>
+        <div ref={colunaRef} className={styles.coluna}>
+          {estado.carga === "CARREGANDO" && estado.turnos.length === 0 && (
+            <div className={styles.carregando}>
+              <Spinner size={16} label="Carregando a conversa" />
+            </div>
+          )}
+          {estado.carga === "FALHOU" && (
+            <div className={styles.falhaCarga}>
+              <Icon name="alert" size={14} className={styles.falhaIcone} />
+              <span>Não consegui carregar a conversa anterior.</span>
+              <Button variant="ghost" size="sm" onClick={chat.recarregar}>
+                Tentar de novo
+              </Button>
+            </div>
+          )}
+          <Fio itens={itens} hoje={blocoHoje} chat={chat} agora={agora.getTime()} corte={estado.corte} />
         </div>
+      </div>
 
-        <InputBar onCreated={onCreated} />
-
-        <div className={styles.dicas}>
-          <span className={styles.dicasRotulo}>Prefixos de tipo</span>
-          {DICAS_DE_PREFIXO.map(({ prefixo }) => (
-            <Badge key={prefixo} variant="outline">{prefixo}</Badge>
-          ))}
+      <div className={styles.rodape}>
+        <div className={styles.rodapeColuna}>
+          <Composer
+            ocupado={chat.ocupado}
+            desligado={estado.desligado}
+            onEnviar={enviar}
+            onSalvarDireto={chat.salvarDireto}
+            onReativar={chat.reativar}
+            pedirFoco={pedirFoco}
+            aoAtenderFoco={aoAtenderFoco}
+          />
         </div>
-
-        {recentes.length > 0 && (
-          <section className={styles.recentes} aria-labelledby="home-recentes">
-            <SectionLabel id="home-recentes">Recentes</SectionLabel>
-            <ul className={styles.lista}>
-              {recentes.map(e => {
-                const meta = aparenciaDoTipo(e.type);
-                const nComentarios = e.threads?.length ?? 0;
-                return (
-                  <li key={e.id}>
-                    <button type="button" className={styles.item} onClick={() => onOpenEntry(e)}>
-                      <span className={styles.tipo}>
-                        {meta.bandeira ? <span aria-hidden="true">{meta.bandeira}</span> : <Icon name={meta.icone} size={14} />}
-                        <span className="sr-only">{rotulo("tipo_entrada", e.type)}:</span>
-                      </span>
-                      <span className={styles.tituloItem}>{e.title || "Sem título"}</span>
-                      {nComentarios > 0 && (
-                        <span className={styles.meta}>
-                          <Icon name="message" size={12} />
-                          {nComentarios}
-                          <span className="sr-only">{nComentarios === 1 ? " comentário" : " comentários"}</span>
-                        </span>
-                      )}
-                      <span className={styles.meta}>{relativeDate(e.date)}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
       </div>
     </div>
   );

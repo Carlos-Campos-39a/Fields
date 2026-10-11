@@ -162,4 +162,17 @@ export const api = {
   getResumoDoDia: (data) => req("GET", comQuery("/resumo-do-dia", { data })),
   desfazerAgente: (turnoId, idx) =>
     req("POST", "/agente/desfazer", idx === undefined ? { turno_id: turnoId } : { turno_id: turnoId, idx }),
+  // O chat da Home (A2b) — contrato FIXO da §9.2 do plano; quem lê as respostas é home/chat.js.
+  //   chatAgente  → 202 {turno_id} (o turno roda em segundo plano; consulte getTurno a cada 1 s), ou
+  //                 200 <turno> já pronto quando o texto é o comando "desfazer" (sem modelo).
+  //                 503 AGENTE_DESLIGADO: o servidor está sem o assistente (a tela salva como nota).
+  //   getTurno    → <turno> = {turno_id, status, motivo, texto, acoes, progresso:{n_tools}, …}
+  //   getConversa → {turnos: [<turno>…]}, do mais antigo ao mais novo
+  // `contexto` leva só o id da tarefa vinculada: o corpo é estrito no backend (z.strictObject), e o
+  // nome e o caminho da tarefa são da tela.
+  chatAgente: (texto, contexto) =>
+    req("POST", "/agente/chat", contexto?.tarefa_id ? { texto, contexto: { tarefa_id: contexto.tarefa_id } } : { texto }),
+  getTurno:     (id) => req("GET", `/agente/turnos/${seg(id)}`),
+  getConversa:  ({ canal = "web", limite = 30 } = {}) => req("GET", comQuery("/agente/conversa", { canal, limite })),
+  novaConversa: (canal = "web") => req("POST", "/agente/nova-conversa", { canal }),
 };

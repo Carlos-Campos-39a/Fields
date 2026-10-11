@@ -1,0 +1,121 @@
+/* O card "Hoje" (home/HojeCard.jsx). Cartão com borda de 1px, sem sombra (tokens.css). */
+
+.card {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.data {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  text-align: right;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 48px;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.lista {
+  list-style: none;
+}
+
+/* Compromissos e tarefas: dois blocos, separados como as linhas. */
+.lista + .lista,
+.lista > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--text);
+  font-size: var(--fs-base);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.linha:hover {
+  background: var(--surface-2);
+}
+
+/* O anel por dentro: o cartão tem overflow hidden. */
+.linha:focus-visible {
+  outline-offset: -2px;
+}
+
+.icone {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+/* A hora em coluna fixa e algarismos tabulares: os títulos começam todos no mesmo x. */
+.hora {
+  flex-shrink: 0;
+  min-width: 6.5em;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+/* Coluna: o nome em cima, o caminho (projeto › frente) embaixo. As reticências são de cada linha —
+   num contêiner flex elas não pegam o texto dos filhos. */
+.titulo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nome,
+.caminho {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nome {
+  font-weight: var(--fw-medium);
+}
+
+.caminho {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.selo {
+  flex-shrink: 0;
+}
+
+.mais {
+  justify-content: center;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+@media (max-width: 767.98px) {
+  .hora {
+    min-width: 5em;
+  }
+}

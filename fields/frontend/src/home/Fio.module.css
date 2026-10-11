@@ -1,0 +1,224 @@
+/* O fio da conversa (home/Fio.jsx). O pedido é bolha em --surface-2; a resposta não tem bolha:
+   é texto em Lora sobre o fundo, como uma página. */
+
+.fio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/* ── Divisores: o dia ("Ontem") e a conversa que recomeçou ───────────────────────────── */
+.divisor {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-3);
+}
+
+.divisor::before,
+.divisor::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.divisorTexto {
+  flex-shrink: 0;
+}
+
+/* ── Um turno ─────────────────────────────────────────────────────────────────────────── */
+.turno {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.pedido {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  padding-left: 15%;
+}
+
+.contexto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* O nome num elemento próprio: texto solto num flex vira item anônimo, e o ellipsis não o alcança. */
+.contextoNome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* O texto do Carlos como ele escreveu: quebras de linha mantidas, nada interpretado. */
+.bolha {
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.resposta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.progresso {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.progressoDetalhe {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressoDetalhe::before {
+  content: "· ";
+}
+
+.aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.avisoIcone {
+  flex-shrink: 0;
+  color: var(--warning-ink);
+}
+
+/* ── Chips de ação ────────────────────────────────────────────────────────────────────── */
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  min-height: 32px;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.chipIcone {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.chipResumo {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* "Desfazer" em --accent-ink sobre --surface (4,7:1); hover sublinha, como no toast. */
+.desfazer {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 var(--sp-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--accent-ink);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.desfazer:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.desfazer:disabled {
+  cursor: progress;
+  color: var(--text-3);
+}
+
+/* Desfeito: o que foi feito, riscado — a história fica, mas não vale mais. */
+.chipDesfeito {
+  background: transparent;
+  border-style: dashed;
+}
+
+.chipDesfeito .chipResumo {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.desfeito {
+  flex-shrink: 0;
+  padding-right: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-3);
+}
+
+/* ── Fim do turno: nota salva e os botões de saída ────────────────────────────────────── */
+.nota {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--success-ink);
+}
+
+.link {
+  color: var(--accent-ink);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+@media (max-width: 767.98px) {
+  .fio {
+    gap: var(--sp-5);
+  }
+
+  .pedido {
+    padding-left: var(--sp-6);
+  }
+}
