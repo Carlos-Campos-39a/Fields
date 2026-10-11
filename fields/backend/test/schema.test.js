@@ -5,11 +5,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DDL_A1, DDL_A2, DDL_A2B, DDL_BASE, listaSql } from "../src/db/schema.js";
+import { DDL_A1, DDL_A2, DDL_A2B, DDL_A3, DDL_BASE, listaSql } from "../src/db/schema.js";
 import {
   ACOES_HISTORICO, ALVOS_COMENTARIO, CANAIS, COLUNAS_KANBAN, COLUNA_FEITO, ENTIDADES, MEMORIA_ARQUIVADA,
   MEMORIA_ATIVA, ORIGENS, STATUS, STATUS_CONCLUIDO, STATUS_MEMORIA, TIPOS_AGENDADOS, TIPOS_ENTRADA,
   CANAIS_DO_MOTOR, ROLES_MENSAGEM, SESSAO_ATIVA, STATUS_SESSAO, STATUS_TURNO, TURNO_EM_ANDAMENTO,
+  EVENTO_CONCLUIDO, EVENTO_EM_VOO, STATUS_EVENTO,
 } from "../src/dominio/enums.js";
 import { MEMORIA_TEXTO_MAX } from "../src/dominio/limites.js";
 
@@ -153,4 +154,28 @@ test("enums da A2b: o motor conversa em web e whatsapp (não no mcp), e os statu
   assert.deepEqual([...STATUS_SESSAO], ["ATIVA", "ENCERRADA"]);
   assert.deepEqual([...ROLES_MENSAGEM], ["user", "assistant"]);
   for (const lista of [CANAIS_DO_MOTOR, STATUS_TURNO, STATUS_SESSAO, ROLES_MENSAGEM]) assert.ok(Object.isFrozen(lista));
+});
+
+// ─── A3 · o webhook do WhatsApp: idempotência pelo wamid e o canal da Fase 2 ───
+
+test("A3: eventos_recebidos com o wamid como chave, o CHECK do status vindo do enum, e o índice da limpeza", () => {
+  assert.match(DDL_A3, /CREATE TABLE IF NOT EXISTS eventos_recebidos \(\s+event_id\s+TEXT PRIMARY KEY,/);
+  const esperado = `CONSTRAINT eventos_recebidos_status_check CHECK (status IN (${listaSql(STATUS_EVENTO)}))`;
+  assert.ok(DDL_A3.includes(esperado), esperado);
+  assert.ok(DDL_A3.includes(`DEFAULT '${EVENTO_EM_VOO}'`), "a linha nasce EM_VOO (a reserva)");
+  assert.equal((DDL_A3.match(/CHECK \(/g) ?? []).length, 1, "nenhum CHECK fora deste");
+  for (const coluna of ["turno_id", "resposta", "tentativas", "criado_em", "concluido_em"]) assert.match(DDL_A3, new RegExp(`\\b${coluna}\\s+`), coluna);
+  assert.match(DDL_A3, /\bresposta\s+JSONB/);
+  assert.match(DDL_A3, /CREATE INDEX IF NOT EXISTS \w+ ON eventos_recebidos \(criado_em\)/);
+  assert.match(DDL_A3, /CREATE TABLE IF NOT EXISTS canais_whatsapp \(\s+wa_id\s+TEXT PRIMARY KEY,\s+conversation_id\s+BIGINT\s+NOT NULL,\s+bot_id\s+BIGINT,/);
+  assert.deepEqual([...STATUS_EVENTO], ["EM_VOO", "CONCLUIDO"]);
+  assert.deepEqual([EVENTO_EM_VOO, EVENTO_CONCLUIDO], [...STATUS_EVENTO]);
+  assert.ok(Object.isFrozen(STATUS_EVENTO));
+});
+
+test("A3 é aditiva: só CREATE ... IF NOT EXISTS, nada destrutivo (a limpeza de 7 dias é do serviço, nunca do boot)", () => {
+  assert.doesNotMatch(DDL_A3, /\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bALTER\b|\bRENAME\b/i);
+  assert.doesNotMatch(DDL_A3, /CREATE (UNIQUE )?(TABLE|INDEX) (?!IF NOT EXISTS)/);
+  assert.deepEqual([...DDL_A3.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["eventos_recebidos", "canais_whatsapp"]);
+  for (const ddl of [DDL_BASE, DDL_A1, DDL_A2, DDL_A2B]) assert.doesNotMatch(ddl, /eventos_recebidos|canais_whatsapp/);
 });

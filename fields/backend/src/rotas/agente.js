@@ -55,11 +55,14 @@ const invalido = (res, erro) =>
   responderErro(res, { ...erroDe({ ok: false, motivo: "ARGUMENTOS_INVALIDOS" }), campos: camposDoErro(erro) }, 400);
 
 /**
+ * As dependências do motor para as rotas que rodam turno — a tela (aqui) e o WhatsApp
+ * (rotas/whatsapp.js). Montadas UMA vez por app (app.js) e divididas entre as duas: um cliente do
+ * modelo por processo, e a mesma loja.
+ *
  * `motor` são as costuras do teste ({cliente, loja, executar, desfazer, relogio}); sem elas, o
  * cliente sai da config (criado na primeira mensagem) e a persistência é o Postgres.
  */
-export function rotasAgente({ db, estado, config, motor = {} }) {
-  const r = express.Router();
+export function criarDepsDoMotor({ db, estado, config, motor = {} }) {
   const agente = config?.agente ?? { habilitado: false };
   const loja = motor.loja ?? lojaSql(db);
   let cliente = motor.cliente ?? null;
@@ -67,6 +70,12 @@ export function rotasAgente({ db, estado, config, motor = {} }) {
     cliente ??= criarCliente(agente);
     return { db, comentariosMigrados: estado.comentariosMigrados, agente, ...motor, cliente, loja };
   };
+  return { agente, loja, deps };
+}
+
+export function rotasAgente({ db, estado, config, motor = {}, depsMotor = criarDepsDoMotor({ db, estado, config, motor }) }) {
+  const r = express.Router();
+  const { agente, loja, deps } = depsMotor;
 
   r.get("/resumo-do-dia", aw(async (req, res) => {
     const args = req.query.data === undefined ? {} : { data: req.query.data };

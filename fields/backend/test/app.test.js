@@ -397,7 +397,7 @@ test("POST /api/entries sem data usa o hoje de Brasília", async () => {
 });
 
 // ─── Guardas reflexivas ───
-test("as URLs são exatamente as de antes, mais as três de auth, as dez da A1, as seis da A2 e as quatro do chat (A2b)", async () => {
+test("as URLs são exatamente as de antes, mais as três de auth, as dez da A1, as seis da A2, as quatro do chat (A2b) e o webhook do WhatsApp (A3)", async () => {
   const s = await subir();
   try {
     const rotas = s.app.locals.rotas.map((r) => `${r.metodo} ${r.template}`).sort();
@@ -412,7 +412,7 @@ test("as URLs são exatamente as de antes, mais as três de auth, as dez da A1, 
       "GET /api/projects", "GET /api/resumo-do-dia",
       "PATCH /api/entries/:id", "PATCH /api/frentes/:id", "PATCH /api/meetings/:id",
       "PATCH /api/projects/:id", "PATCH /api/tasks/:id",
-      "POST /api/agente/chat", "POST /api/agente/desfazer", "POST /api/agente/nova-conversa",
+      "POST /api/agente/chat", "POST /api/agente/desfazer", "POST /api/agente/nova-conversa", "POST /api/agente/whatsapp",
       "POST /api/auth/login", "POST /api/auth/logout",
       "POST /api/comentarios", "POST /api/comentarios/:id/restaurar",
       "POST /api/entries", "POST /api/entries/:id/restaurar",
@@ -426,7 +426,9 @@ test("as URLs são exatamente as de antes, mais as três de auth, as dez da A1, 
 });
 
 test("toda rota fora de ROTAS_PUBLICAS responde 401 sem credencial", async () => {
-  assert.deepEqual([...ROTAS_PUBLICAS], ["GET /api/health", "POST /api/auth/login"], "a guarda da guarda");
+  // O webhook do WhatsApp (A3) é público para a SESSÃO, não para o mundo: quem o autentica é o HMAC da
+  // Les Chats (test/whatsapp.test.js cobre a recusa sem ele).
+  assert.deepEqual([...ROTAS_PUBLICAS], ["GET /api/health", "POST /api/auth/login", "POST /api/agente/whatsapp"], "a guarda da guarda");
   const s = await subir();
   try {
     for (const { metodo, template } of s.app.locals.rotas) {
